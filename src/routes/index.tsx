@@ -14,9 +14,9 @@ type MenuItem = {
 };
 
 export const Route = createFileRoute("/")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    mesa: search["mesa"] != null ? String(search["mesa"]) : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): { mesa?: string } =>
+    search["mesa"] != null ? { mesa: String(search["mesa"]) } : {},
+
   head: () => ({
     meta: [
       { title: "Menú | Restaurante Punto Verde" },
