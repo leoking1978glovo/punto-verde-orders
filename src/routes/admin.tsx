@@ -78,8 +78,20 @@ function AdminPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    status({}).then((r) => setUnlocked(r.unlocked));
-  }, [status]);
+    let cancelled = false;
+    status({})
+      .then((r) => {
+        if (!cancelled) setUnlocked(r.unlocked === true);
+      })
+      .catch((err) => {
+        console.error("admin status", err);
+        if (!cancelled) setUnlocked(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function onLogin(e: React.FormEvent) {
     e.preventDefault();
