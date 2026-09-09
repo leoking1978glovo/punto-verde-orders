@@ -102,7 +102,6 @@ function MenuPage() {
     },
   });
 
-  // Los cambios del panel de administración se reflejan al instante.
   useEffect(() => {
     const channel = supabase
       .channel("menu-cliente")
@@ -287,20 +286,8 @@ function MenuPage() {
 
       {!tableNumber && (
         <div className="mx-5 mt-5 rounded-2xl border border-clay/40 bg-sand p-4 text-sm text-secondary-foreground">
-          Abre el enlace con el número de tu mesa, por ejemplo{" "}
-          <span className="font-semibold">?mesa=5</span>, para poder confirmar el pedido.
-          <div className="mt-3 flex flex-wrap gap-2">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <Link
-                key={n}
-                to="/"
-                search={{ mesa: String(n) }}
-                className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground"
-              >
-                Mesa {n}
-              </Link>
-            ))}
-          </div>
+          Para pedir, escanea el código QR que está en tu mesa. Si ya lo hiciste y ves este mensaje,
+          pide ayuda a nuestro equipo.
         </div>
       )}
 
