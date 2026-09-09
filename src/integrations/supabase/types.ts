@@ -21,9 +21,11 @@ export type Database = {
           created_at: string
           description: string
           id: string
+          image_url: string
           name: string
           price: number
           sort_order: number
+          tags: string[]
         }
         Insert: {
           available?: boolean
@@ -31,9 +33,11 @@ export type Database = {
           created_at?: string
           description?: string
           id?: string
+          image_url?: string
           name: string
           price: number
           sort_order?: number
+          tags?: string[]
         }
         Update: {
           available?: boolean
@@ -41,9 +45,11 @@ export type Database = {
           created_at?: string
           description?: string
           id?: string
+          image_url?: string
           name?: string
           price?: number
           sort_order?: number
+          tags?: string[]
         }
         Relationships: []
       }
