@@ -1,8 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Leaf, Minus, Plus, ShoppingBag, Check, ChefHat } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Leaf,
+  Minus,
+  Plus,
+  ShoppingBag,
+  Check,
+  ChefHat,
+  Flame,
+  Sprout,
+  WheatOff,
+  Moon,
+  Sun,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useTheme } from "@/lib/theme";
 
 type MenuItem = {
   id: string;
@@ -11,6 +24,8 @@ type MenuItem = {
   description: string;
   price: number;
   sort_order: number;
+  image_url: string;
+  tags: string[];
 };
 
 export const Route = createFileRoute("/")({
@@ -45,16 +60,41 @@ const currency = (value: number) =>
   new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })
     .format(value);
 
+const CATEGORY_ORDER = ["Entradas", "Platos fuertes", "Bebidas", "Postres"];
+
+const TAG_META: Record<string, { icon: typeof Sprout; className: string }> = {
+  Vegano: { icon: Sprout, className: "bg-primary/12 text-primary" },
+  "Sin gluten": { icon: WheatOff, className: "bg-accent/30 text-accent-foreground" },
+  Picante: { icon: Flame, className: "bg-destructive/12 text-destructive" },
+};
+
+function TagChip({ tag }: { tag: string }) {
+  const meta = TAG_META[tag];
+  const Icon = meta?.icon ?? Leaf;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+        meta?.className ?? "bg-muted text-muted-foreground"
+      }`}
+    >
+      <Icon className="size-3" />
+      {tag}
+    </span>
+  );
+}
+
 function MenuPage() {
   const { mesa } = Route.useSearch();
   const tableNumber = mesa && /^\d+$/.test(mesa) ? Number(mesa) : null;
+  const { theme, toggle } = useTheme();
+  const queryClient = useQueryClient();
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["menu"],
     queryFn: async (): Promise<MenuItem[]> => {
       const { data, error } = await supabase
         .from("menu_items")
-        .select("id, category, name, description, price, sort_order")
+        .select("id, category, name, description, price, sort_order, image_url, tags")
         .eq("available", true)
         .order("sort_order");
       if (error) throw error;
@@ -62,13 +102,55 @@ function MenuPage() {
     },
   });
 
+  // Los cambios del panel de administración se reflejan al instante.
+  useEffect(() => {
+    const channel = supabase
+      .channel("menu-cliente")
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["menu"] });
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   const categories = useMemo(() => {
     const map = new Map<string, MenuItem[]>();
     for (const item of items) {
       map.set(item.category, [...(map.get(item.category) ?? []), item]);
     }
-    return [...map.entries()];
+    return [...map.entries()].sort((a, b) => {
+      const ia = CATEGORY_ORDER.indexOf(a[0]);
+      const ib = CATEGORY_ORDER.indexOf(b[0]);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
   }, [items]);
+
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (categories.length === 0) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        if (visible) setActiveCategory(visible.target.getAttribute("data-category"));
+      },
+      { rootMargin: "-140px 0px -60% 0px", threshold: 0 },
+    );
+    for (const el of Object.values(sectionRefs.current)) if (el) observer.observe(el);
+    return () => observer.disconnect();
+  }, [categories]);
+
+  const scrollTo = (category: string) => {
+    const el = sectionRefs.current[category];
+    if (!el) return;
+    const top = el.getBoundingClientRect().top + window.scrollY - 116;
+    window.scrollTo({ top, behavior: "smooth" });
+  };
 
   const [cart, setCart] = useState<Record<string, number>>({});
   const [sending, setSending] = useState(false);
@@ -152,13 +234,24 @@ function MenuPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background font-sans pb-40">
-      <header className="bg-deep px-5 pb-8 pt-10 text-primary-foreground rounded-b-[2rem]">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-primary-foreground/70">
-          <Leaf className="size-4" />
-          Cocina fresca y natural
+    <div className="min-h-screen bg-background font-sans pb-44">
+      <header className="bg-deep px-5 pb-8 pt-8 text-primary-foreground rounded-b-[2rem]">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-primary-foreground/70">
+              <Leaf className="size-4" />
+              Cocina fresca y natural
+            </div>
+            <h1 className="mt-3 font-display text-[2rem] leading-tight">Restaurante Punto Verde</h1>
+          </div>
+          <button
+            onClick={toggle}
+            aria-label={theme === "dark" ? "Activar tema claro" : "Activar tema oscuro"}
+            className="mt-1 flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-foreground/15 text-primary-foreground"
+          >
+            {theme === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
+          </button>
         </div>
-        <h1 className="mt-3 font-display text-4xl leading-tight">Restaurante Punto Verde</h1>
         <p className="mt-2 text-sm text-primary-foreground/80">
           {tableNumber
             ? `Estás pidiendo desde la mesa ${tableNumber}.`
@@ -170,6 +263,27 @@ function MenuPage() {
           </div>
         )}
       </header>
+
+      {categories.length > 0 && (
+        <nav className="sticky top-0 z-10 -mt-4 border-b border-border bg-background/90 px-3 py-3 backdrop-blur">
+          <ul className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none]">
+            {categories.map(([category]) => (
+              <li key={category}>
+                <button
+                  onClick={() => scrollTo(category)}
+                  className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                    activeCategory === category
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-secondary-foreground"
+                  }`}
+                >
+                  {category}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
 
       {!tableNumber && (
         <div className="mx-5 mt-5 rounded-2xl border border-clay/40 bg-sand p-4 text-sm text-secondary-foreground">
@@ -194,19 +308,47 @@ function MenuPage() {
         {isLoading && <p className="py-10 text-center text-muted-foreground">Cargando menú…</p>}
 
         {categories.map(([category, list]) => (
-          <section key={category} className="mt-8">
+          <section
+            key={category}
+            data-category={category}
+            ref={(el) => {
+              sectionRefs.current[category] = el;
+            }}
+            className="mt-8 scroll-mt-32"
+          >
             <h2 className="font-display text-2xl text-foreground">{category}</h2>
             <div className="mt-1 h-px w-16 bg-clay" />
-            <ul className="mt-4 space-y-3">
+            <ul className="mt-4 space-y-4">
               {list.map((item) => (
                 <li
                   key={item.id}
-                  className="rounded-2xl border border-border bg-card p-4 shadow-sm"
+                  className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
+                  {item.image_url ? (
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      loading="lazy"
+                      width={768}
+                      height={576}
+                      className="h-44 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-24 w-full items-center justify-center bg-secondary text-secondary-foreground">
+                      <Leaf className="size-6" />
+                    </div>
+                  )}
+                  <div className="flex items-start justify-between gap-3 p-4">
+                    <div className="min-w-0">
                       <h3 className="font-semibold text-card-foreground">{item.name}</h3>
                       <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
+                      {item.tags?.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {item.tags.map((tag) => (
+                            <TagChip key={tag} tag={tag} />
+                          ))}
+                        </div>
+                      )}
                       <p className="mt-2 font-display text-lg text-primary">
                         {currency(item.price)}
                       </p>
@@ -239,12 +381,15 @@ function MenuPage() {
           </section>
         ))}
 
-        <div className="mt-10 text-center">
+        <div className="mt-10 flex justify-center gap-6">
           <Link
             to="/cocina"
             className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground"
           >
             <ChefHat className="size-4" /> Vista de cocina
+          </Link>
+          <Link to="/admin" className="text-xs uppercase tracking-widest text-muted-foreground">
+            Administración
           </Link>
         </div>
       </main>
@@ -271,7 +416,7 @@ function MenuPage() {
       )}
 
       {count > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-card/95 p-4 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 p-4 backdrop-blur">
           <div className="mb-3 max-h-32 space-y-1 overflow-y-auto text-sm">
             {cartLines.map((l) => (
               <div key={l.item.id} className="flex justify-between text-muted-foreground">
