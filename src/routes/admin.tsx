@@ -75,6 +75,7 @@ function AdminPage() {
   const [unlocked, setUnlocked] = useState<boolean | null>(null);
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState(false);
+  const [loginMessage, setLoginMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -97,10 +98,14 @@ function AdminPage() {
     e.preventDefault();
     setBusy(true);
     setLoginError(false);
+    setLoginMessage("");
     try {
       const { ok } = await login({ data: { password } });
       if (ok) setUnlocked(true);
       else setLoginError(true);
+    } catch (err) {
+      setLoginError(true);
+      setLoginMessage(err instanceof Error ? err.message : "Error al entrar");
     } finally {
       setBusy(false);
       setPassword("");
@@ -132,6 +137,9 @@ function AdminPage() {
           />
           {loginError && (
             <p className="mt-2 text-sm text-destructive">Contraseña incorrecta.</p>
+          )}
+          {loginMessage && (
+            <p className="mt-2 text-sm text-destructive">{loginMessage}</p>
           )}
           <button
             disabled={busy}
