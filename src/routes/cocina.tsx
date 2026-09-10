@@ -72,7 +72,7 @@ function KitchenPage() {
   }, [queryClient]);
 
   async function closeOrder(id: string) {
-    await supabase.from("orders").update({ status: "cerrado" }).eq("id", id);
+    await supabase.from("orders").update({ status: "servido" }).eq("id", id);
     queryClient.invalidateQueries({ queryKey: ["active-orders"] });
   }
 
