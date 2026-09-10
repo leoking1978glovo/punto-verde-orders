@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock, LogOut, Plus, Pencil, Trash2, EyeOff, Eye, X } from "lucide-react";
+import { Lock, LogOut, Plus, Pencil, Trash2, EyeOff, Eye, X, ReceiptText } from "lucide-react";
 import {
   adminStatus,
   adminLogin,
@@ -225,13 +225,22 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             <h1 className="mt-2 font-display text-3xl">Menú - Punto Verde</h1>
             <p className="mt-1 text-sm text-primary-foreground/80">{items.length} producto(s)</p>
           </div>
-          <button
-            onClick={onLogout}
-            aria-label="Cerrar sesión"
-            className="flex size-10 items-center justify-center rounded-full bg-primary-foreground/15"
-          >
-            <LogOut className="size-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/tickets"
+              aria-label="Tickets y cierre de caja"
+              className="mt-1 flex size-10 items-center justify-center rounded-full bg-primary-foreground/15 text-primary-foreground"
+            >
+              <ReceiptText className="size-5" />
+            </Link>
+            <button
+              onClick={onLogout}
+              aria-label="Cerrar sesión"
+              className="mt-1 flex size-10 items-center justify-center rounded-full bg-primary-foreground/15"
+            >
+              <LogOut className="size-5" />
+            </button>
+          </div>
         </div>
       </header>
 
