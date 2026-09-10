@@ -175,7 +175,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const remove = useServerFn(adminDeleteItem);
   const toggle = useServerFn(adminToggleAvailable);
 
-  const { data: items = [], isLoading } = useQuery({
+  const { data: items = [], isLoading, error: listError } = useQuery({
     queryKey: ["admin-menu"],
     queryFn: () => list({}) as Promise<AdminMenuItem[]>,
   });
@@ -253,6 +253,12 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         </button>
 
         {isLoading && <p className="py-10 text-center text-muted-foreground">Cargando…</p>}
+
+        {listError && (
+          <p className="mt-4 rounded-2xl bg-destructive/10 p-4 text-sm text-destructive">
+            Error cargando productos: {listError instanceof Error ? listError.message : "desconocido"}
+          </p>
+        )}
 
         <ul className="mt-5 space-y-3">
           {items.map((item) => (
