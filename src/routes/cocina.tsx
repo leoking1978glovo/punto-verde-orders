@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Clock, CookingPot, Eye, Printer, Settings2, X } from "lucide-react";
-import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 
 type TableInfo = {
@@ -66,52 +65,62 @@ function orderTotal(order: ActiveOrder) {
   return order.order_items.reduce((sum, i) => sum + Number(i.unit_price) * i.quantity, 0);
 }
 
-function downloadTicketPdf(order: ActiveOrder) {
+function printTicket(order: ActiveOrder) {
   const total = orderTotal(order);
-  const doc = new jsPDF({ unit: "mm", format: [80, 140] });
-
-  let y = 12;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.text("Restaurante Punto Verde", 40, y, { align: "center" });
-  y += 6;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text("Cocina fresca y natural", 40, y, { align: "center" });
-  y += 6;
-  doc.line(6, y, 74, y);
-  y += 6;
-
-  doc.setFontSize(10);
-  doc.text(`Mesa: ${order.table_number}`, 6, y);
-  doc.text(
-    new Date(order.created_at).toLocaleString("es-CO", {
-      dateStyle: "short",
-      timeStyle: "short",
-    }),
-    74,
-    y,
-    { align: "right" }
-  );
-  y += 7;
-
-  doc.setFontSize(9);
-  order.order_items.forEach((item) => {
-    const line = `${item.quantity} x ${item.name}`;
-    doc.text(line.substring(0, 32), 6, y);
-    doc.text(currency(Number(item.unit_price) * item.quantity), 74, y, { align: "right" });
-    y += 5;
+  const fecha = new Date(order.created_at).toLocaleString("es-CO", {
+    dateStyle: "short",
+    timeStyle: "short",
   });
+  const filas = order.order_items
+    .map(
+      (item) => `
+      <tr>
+        <td class="qty">${item.quantity}</td>
+        <td>${item.name}</td>
+        <td class="right">${currency(Number(item.unit_price) * item.quantity)}</td>
+      </tr>`
+    )
+    .join("");
 
-  y += 2;
-  doc.line(6, y, 74, y);
-  y += 6;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text("TOTAL", 6, y);
-  doc.text(currency(total), 74, y, { align: "right" });
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Comanda - Mesa ${order.table_number}</title>
+  <style>
+    body { font-family: Arial, sans-serif; width: 280px; margin: 0 auto; padding: 12px; color: #000; }
+    h1 { font-size: 16px; text-align: center; margin: 0; }
+    .sub { font-size: 11px; text-align: center; color: #444; margin: 2px 0 8px; }
+    .meta { font-size: 12px; display: flex; justify-content: space-between; margin-bottom: 6px; }
+    hr { border: none; border-top: 1px dashed #000; margin: 6px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    td { padding: 3px 0; vertical-align: top; }
+    .qty { width: 24px; font-weight: bold; }
+    .right { text-align: right; white-space: nowrap; }
+    .total { font-size: 14px; font-weight: bold; display: flex; justify-content: space-between; margin-top: 4px; }
+    .pie { font-size: 10px; text-align: center; color: #444; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>RESTAURANTE PUNTO VERDE</h1>
+  <p class="sub">Cocina fresca y natural</p>
+  <div class="meta"><span>Mesa: <b>${order.table_number}</b></span><span>${fecha}</span></div>
+  <hr />
+  <table>${filas}</table>
+  <hr />
+  <div class="total"><span>TOTAL</span><span>${currency(total)}</span></div>
+  <p class="pie">Comanda de cocina</p>
+  <script>window.onload = function() { window.print(); };</script>
+</body>
+</html>`;
 
-  doc.save(`comanda-mesa${order.table_number}-${order.id.slice(0, 8)}.pdf`);
+  const win = window.open("", "_blank", "width=400,height=600");
+  if (!win) {
+    alert("El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para este sitio.");
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
 }
 
 function KitchenPage() {
@@ -400,10 +409,10 @@ function KitchenPage() {
 
             <div className="mt-5 flex gap-2">
               <button
-                onClick={() => downloadTicketPdf(selectedOrder)}
+                onClick={() => printTicket(selectedOrder)}
                 className="flex flex-1 items-center justify-center gap-2 rounded-full bg-secondary py-3 text-sm font-semibold text-secondary-foreground active:scale-[0.99]"
               >
-                <Printer className="size-4" /> Imprimir ticket
+                <Printer className="size-4" /> Imprimir comanda
               </button>
               <button
                 onClick={() => confirmClose(selectedOrder)}
