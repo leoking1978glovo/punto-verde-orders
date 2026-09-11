@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { jsPDF } from "jspdf";
-import { ArrowLeft, Download, Lock, ReceiptText } from "lucide-react";
+import { ArrowLeft, Download, Lock, ReceiptText, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { adminStatus } from "@/lib/admin.functions";
 
@@ -98,8 +98,10 @@ function downloadTicketPdf(order: OrderRow, items: ItemRow[]) {
 
 function TicketsPage() {
   const status = useServerFn(adminStatus);
+  const queryClient = useQueryClient();
   const [unlocked, setUnlocked] = useState<boolean | null>(null);
   const [date, setDate] = useState(todayLocal());
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,6 +117,8 @@ function TicketsPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["tickets"] });
 
   const { data: orders = [] } = useQuery({
     queryKey: ["tickets", date],
@@ -171,6 +175,35 @@ function TicketsPage() {
       ),
     [orders, itemsByOrder]
   );
+
+  async function deleteTicket(order: OrderRow) {
+    if (!window.confirm(`¿Borrar el ticket de la Mesa ${order.table_number}? Esta acción no se puede deshacer.`)) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("orders").delete().eq("id", order.id);
+      if (error) throw error;
+      refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "No se pudo borrar el ticket.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function deleteAllTickets() {
+    if (orderIds.length === 0) return;
+    if (!window.confirm(`¿Borrar los ${orderIds.length} tickets de esta fecha? Esta acción no se puede deshacer.`)) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("orders").delete().in("id", orderIds);
+      if (error) throw error;
+      refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "No se pudieron borrar los tickets.");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   if (unlocked === null) {
     return <p className="p-10 text-center text-muted-foreground">Cargando…</p>;
@@ -239,6 +272,16 @@ function TicketsPage() {
             <p className="mt-1 font-display text-2xl">{currency(totalDia)}</p>
           </div>
         </div>
+
+        {orders.length > 0 && (
+          <button
+            onClick={deleteAllTickets}
+            disabled={deleting}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-primary-foreground/15 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            <Trash2 className="size-4" /> Borrar todos los tickets de esta fecha
+          </button>
+        )}
       </header>
 
       <main className="px-5">
@@ -283,12 +326,22 @@ function TicketsPage() {
                   ))}
                 </ul>
 
-                <button
-                  onClick={() => downloadTicketPdf(order, orderItems)}
-                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground"
-                >
-                  <Download className="size-4" /> Descargar ticket (PDF)
-                </button>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => downloadTicketPdf(order, orderItems)}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground"
+                  >
+                    <Download className="size-4" /> Descargar ticket (PDF)
+                  </button>
+                  <button
+                    onClick={() => deleteTicket(order)}
+                    disabled={deleting}
+                    aria-label={`Borrar ticket Mesa ${order.table_number}`}
+                    className="flex size-10 items-center justify-center rounded-full bg-destructive/12 text-destructive disabled:opacity-50"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
               </li>
             );
           })}
