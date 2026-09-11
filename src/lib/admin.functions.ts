@@ -138,3 +138,75 @@ export const adminToggleAvailable = createServerFn({ method: "POST" })
     if (error) throw error;
     return { ok: true as const };
   });
+
+// ─────────────────────────────────────────────────────────────
+// Mesas del restaurante (grid de cocina + QR por mesa)
+// ─────────────────────────────────────────────────────────────
+
+export type AdminTable = {
+  id: string;
+  table_number: number;
+  label: string;
+  is_active: boolean;
+};
+
+export const adminListTables = createServerFn({ method: "GET" }).handler(
+  async (): Promise<AdminTable[]> => {
+    await requireUnlocked();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("restaurant_tables")
+      .select("id, table_number, label, is_active")
+      .order("table_number");
+    if (error) throw error;
+    return (data ?? []) as AdminTable[];
+  },
+);
+
+export const adminAddTable = createServerFn({ method: "POST" })
+  .inputValidator((data: { label?: string }) => data)
+  .handler(async ({ data }) => {
+    await requireUnlocked();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // El siguiente número libre es max(table_number) + 1
+    const { data: maxRow } = await supabaseAdmin
+      .from("restaurant_tables")
+      .select("table_number")
+      .order("table_number", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const next = (maxRow?.table_number ?? 0) + 1;
+    const { error } = await supabaseAdmin.from("restaurant_tables").insert({
+      table_number: next,
+      label: data.label?.trim() || `Mesa ${next}`,
+      is_active: true,
+    });
+    if (error) throw error;
+    return { ok: true as const, table_number: next };
+  });
+
+export const adminUpdateTable = createServerFn({ method: "POST" })
+  .inputValidator((data: { id: string; label?: string; is_active?: boolean }) => data)
+  .handler(async ({ data }) => {
+    await requireUnlocked();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const row: Record<string, unknown> = {};
+    if (data.label !== undefined) row.label = data.label.trim();
+    if (data.is_active !== undefined) row.is_active = data.is_active;
+    const { error } = await supabaseAdmin
+      .from("restaurant_tables")
+      .update(row)
+      .eq("id", data.id);
+    if (error) throw error;
+    return { ok: true as const };
+  });
+
+export const adminDeleteTable = createServerFn({ method: "POST" })
+  .inputValidator((data: { id: string }) => data)
+  .handler(async ({ data }) => {
+    await requireUnlocked();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("restaurant_tables").delete().eq("id", data.id);
+    if (error) throw error;
+    return { ok: true as const };
+  });

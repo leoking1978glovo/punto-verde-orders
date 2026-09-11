@@ -13,6 +13,7 @@ import {
   adminToggleAvailable,
   type AdminMenuItem,
 } from "@/lib/admin.functions";
+import { AdminTables } from "@/components/AdminTables";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -270,6 +271,8 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         >
           <Plus className="size-5" /> Nuevo producto
         </button>
+
+        <AdminTables />
 
         {isLoading && <p className="py-10 text-center text-muted-foreground">Cargando…</p>}
 
