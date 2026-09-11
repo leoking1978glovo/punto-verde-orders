@@ -1,9 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Check, Clock, CookingPot, Eye, Printer, Settings2, X } from "lucide-react";
+import {
+  BookOpen,
+  Check,
+  Clock,
+  CookingPot,
+  Eye,
+  Minus,
+  Plus,
+  Printer,
+  Settings2,
+  ShoppingBag,
+  X,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { OrderMenu } from "@/components/OrderMenu";
 
 type TableInfo = {
   id: string;
@@ -129,6 +140,8 @@ function KitchenPage() {
   const [now, setNow] = useState(() => Date.now());
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [menuTable, setMenuTable] = useState<number | null>(null);
+  const [menuCart, setMenuCart] = useState<Record<string, number>>({});
+  const [quickSending, setQuickSending] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30000);
@@ -145,6 +158,22 @@ function KitchenPage() {
         .order("table_number");
       if (error) throw error;
       return (data ?? []) as TableInfo[];
+    },
+  });
+
+  const { data: menuItems = [] } = useQuery({
+    queryKey: ["quick-menu"],
+    queryFn: async (): Promise<
+      { id: string; category: string; name: string; price: number; sort_order: number }[]
+    > => {
+      const { data, error } = await supabase
+        .from("menu_items")
+        .select("id, category, name, price, sort_order")
+        .eq("available", true)
+        .order("category")
+        .order("sort_order");
+      if (error) throw error;
+      return (data ?? []).map((d) => ({ ...d, price: Number(d.price) }));
     },
   });
 
@@ -172,6 +201,9 @@ function KitchenPage() {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "restaurant_tables" }, () => {
         queryClient.invalidateQueries({ queryKey: ["tables"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["quick-menu"] });
       })
       .subscribe();
     return () => {
@@ -218,17 +250,68 @@ function KitchenPage() {
     }
   }
 
-  // Botón "Menú": abre el menú de pedidos para añadir productos a esa mesa
-  if (menuTable != null) {
-    return (
-      <OrderMenu
-        tableNumber={menuTable}
-        badge="Cocina"
-        intro={`Añadiendo productos a la mesa ${menuTable}. Se suman a su pedido activo.`}
-        showBack
-        onBack={() => setMenuTable(null)}
-      />
-    );
+  const quickLines = menuItems
+    .filter((i) => (menuCart[i.id] ?? 0) > 0)
+    .map((i) => ({ item: i, qty: menuCart[i.id] as number }));
+  const quickTotal = quickLines.reduce((s, l) => s + l.item.price * l.qty, 0);
+  const quickCount = quickLines.reduce((s, l) => s + l.qty, 0);
+
+  async function confirmQuickAdd() {
+    if (menuTable == null || quickLines.length === 0) return;
+    setQuickSending(true);
+    try {
+      const { data: existing, error: findError } = await supabase
+        .from("orders")
+        .select("id")
+        .eq("table_number", menuTable)
+        .eq("status", "activo")
+        .maybeSingle();
+      if (findError) throw findError;
+
+      let orderId = existing?.id ?? null;
+      if (!orderId) {
+        const { data: created, error: createError } = await supabase
+          .from("orders")
+          .insert({ table_number: menuTable, status: "activo" })
+          .select("id")
+          .single();
+        if (createError) throw createError;
+        orderId = created.id;
+      }
+
+      const { data: currentItems, error: itemsError } = await supabase
+        .from("order_items")
+        .select("id, menu_item_id, quantity")
+        .eq("order_id", orderId);
+      if (itemsError) throw itemsError;
+
+      for (const line of quickLines) {
+        const match = (currentItems ?? []).find((ci) => ci.menu_item_id === line.item.id);
+        if (match) {
+          const { error: updError } = await supabase
+            .from("order_items")
+            .update({ quantity: match.quantity + line.qty })
+            .eq("id", match.id);
+          if (updError) throw updError;
+        } else {
+          const { error: insError } = await supabase.from("order_items").insert({
+            order_id: orderId,
+            menu_item_id: line.item.id,
+            name: line.item.name,
+            unit_price: line.item.price,
+            quantity: line.qty,
+          });
+          if (insError) throw insError;
+        }
+      }
+
+      await supabase.from("orders").update({ status: "activo" }).eq("id", orderId);
+      queryClient.invalidateQueries({ queryKey: ["active-orders"] });
+      setMenuCart({});
+      setMenuTable(null);
+    } finally {
+      setQuickSending(false);
+    }
   }
 
   const renderOrderCard = (order: ActiveOrder, label?: string) => {
@@ -387,6 +470,116 @@ function KitchenPage() {
           </Link>
         </div>
       </main>
+
+      {/* Ventana flotante en miniatura: añadir productos a la mesa elegida */}
+      {menuTable != null && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-ink/60 p-4 backdrop-blur-sm"
+          onClick={() => {
+            setMenuTable(null);
+            setMenuCart({});
+          }}
+        >
+          <div
+            className="flex max-h-[85vh] w-full max-w-md flex-col rounded-3xl bg-card p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-display text-2xl leading-none">
+                  Añadir · Mesa {menuTable}
+                </h2>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  {(() => {
+                    const o = orderByTable.get(menuTable);
+                    if (o && o.order_items.length > 0) {
+                      const n = o.order_items.reduce((s, i) => s + i.quantity, 0);
+                      return `Pedido actual: ${n} ítem(s) · ${currency(orderTotal(o))}`;
+                    }
+                    return "Sin pedido todavía — esto creará el pedido";
+                  })()}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setMenuTable(null);
+                  setMenuCart({});
+                }}
+                aria-label="Cerrar"
+                className="flex size-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <ul className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+              {menuItems.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-center justify-between gap-2 rounded-xl border border-border bg-background px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-card-foreground">{item.name}</p>
+                    <p className="text-xs text-muted-foreground">{currency(item.price)}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {(menuCart[item.id] ?? 0) > 0 && (
+                      <>
+                        <button
+                          onClick={() =>
+                            setMenuCart((prev) => {
+                              const next = Math.max(0, (prev[item.id] ?? 0) - 1);
+                              const copy = { ...prev };
+                              if (next === 0) delete copy[item.id];
+                              else copy[item.id] = next;
+                              return copy;
+                            })
+                          }
+                          aria-label={`Quitar ${item.name}`}
+                          className="flex size-7 items-center justify-center rounded-full border border-border text-foreground active:scale-95"
+                        >
+                          <Minus className="size-3.5" />
+                        </button>
+                        <span className="w-4 text-center text-sm font-semibold">
+                          {menuCart[item.id]}
+                        </span>
+                      </>
+                    )}
+                    <button
+                      onClick={() =>
+                        setMenuCart((prev) => ({ ...prev, [item.id]: (prev[item.id] ?? 0) + 1 }))
+                      }
+                      aria-label={`Añadir ${item.name}`}
+                      className="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground active:scale-95"
+                    >
+                      <Plus className="size-3.5" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-4 border-t border-border pt-3">
+              <div className="flex justify-between text-sm font-semibold text-card-foreground">
+                <span>Total a añadir</span>
+                <span>{currency(quickTotal)}</span>
+              </div>
+              <button
+                disabled={quickCount === 0 || quickSending}
+                onClick={confirmQuickAdd}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground active:scale-[0.99] disabled:opacity-50"
+              >
+                <ShoppingBag className="size-4" />
+                {quickSending
+                  ? "Añadiendo…"
+                  : quickCount === 0
+                    ? "Elige productos"
+                    : `Añadir ${quickCount} ítem(s) a la mesa ${menuTable}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedOrder && (
         <div
