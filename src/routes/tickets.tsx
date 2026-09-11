@@ -233,55 +233,69 @@ function TicketsPage() {
 
   return (
     <div className="min-h-screen bg-background font-sans pb-16">
-      <header className="bg-deep px-5 pb-7 pt-9 text-primary-foreground rounded-b-[2rem]">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.25em] text-primary-foreground/70">
-              Cierre de caja
-            </p>
-            <h1 className="mt-2 font-display text-3xl">Tickets del día</h1>
+      <header className="relative overflow-hidden rounded-b-[2rem] bg-deep text-primary-foreground">
+        <img
+          src="/hero-bg.jpg"
+          alt=""
+          aria-hidden
+          className="absolute inset-0 h-full w-full object-cover opacity-60"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-ink/70 via-ink/30 to-ink/85" />
+
+        <div className="relative px-5 pb-8 pt-8">
+          <div className="flex items-center justify-between gap-3">
+            <img
+              src="/punto-verde-logo.png"
+              alt="Restaurante Punto Verde"
+              className="size-14 rounded-full object-cover shadow-lg ring-2 ring-white/25"
+            />
+            <Link
+              to="/admin"
+              aria-label="Volver al panel"
+              className="flex size-10 items-center justify-center rounded-full bg-white/15 backdrop-blur"
+            >
+              <ArrowLeft className="size-5" />
+            </Link>
           </div>
-          <Link
-            to="/admin"
-            aria-label="Volver al panel"
-            className="mt-1 flex size-10 items-center justify-center rounded-full bg-primary-foreground/15"
-          >
-            <ArrowLeft className="size-5" />
-          </Link>
+
+          <p className="mt-5 text-xs font-semibold uppercase tracking-[0.35em] text-[#F7C137]">
+            Cierre de caja · · Historial
+          </p>
+          <h1 className="mt-2 font-display text-4xl uppercase leading-[0.95] text-white">
+            Tickets del día
+          </h1>
+
+          <label className="mt-5 block text-sm text-white/85">
+            Fecha
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="mt-1 w-full rounded-xl border-0 bg-white/15 px-3 py-2.5 text-white backdrop-blur [color-scheme:dark]"
+            />
+          </label>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-white/15 p-4 backdrop-blur">
+              <p className="text-xs uppercase tracking-wide text-white/70">Tickets</p>
+              <p className="mt-1 font-display text-2xl">{orders.length}</p>
+            </div>
+            <div className="rounded-2xl bg-white/15 p-4 backdrop-blur">
+              <p className="text-xs uppercase tracking-wide text-white/70">Total vendido</p>
+              <p className="mt-1 font-display text-2xl">{currency(totalDia)}</p>
+            </div>
+          </div>
+
+          {orders.length > 0 && (
+            <button
+              onClick={deleteAllTickets}
+              disabled={deleting}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-white/15 py-2.5 text-sm font-semibold backdrop-blur disabled:opacity-50"
+            >
+              <Trash2 className="size-4" /> Borrar todos los tickets de esta fecha
+            </button>
+          )}
         </div>
-
-        <label className="mt-5 block text-sm text-primary-foreground/80">
-          Fecha
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="mt-1 w-full rounded-xl border-0 bg-primary-foreground/15 px-3 py-2.5 text-primary-foreground [color-scheme:dark]"
-          />
-        </label>
-
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-primary-foreground/15 p-4">
-            <p className="text-xs uppercase tracking-wide text-primary-foreground/70">Tickets</p>
-            <p className="mt-1 font-display text-2xl">{orders.length}</p>
-          </div>
-          <div className="rounded-2xl bg-primary-foreground/15 p-4">
-            <p className="text-xs uppercase tracking-wide text-primary-foreground/70">
-              Total vendido
-            </p>
-            <p className="mt-1 font-display text-2xl">{currency(totalDia)}</p>
-          </div>
-        </div>
-
-        {orders.length > 0 && (
-          <button
-            onClick={deleteAllTickets}
-            disabled={deleting}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-primary-foreground/15 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-          >
-            <Trash2 className="size-4" /> Borrar todos los tickets de esta fecha
-          </button>
-        )}
       </header>
 
       <main className="px-5">

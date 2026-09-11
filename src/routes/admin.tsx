@@ -216,31 +216,50 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
   return (
     <div className="min-h-screen bg-background font-sans pb-24">
-      <header className="bg-deep px-5 pb-7 pt-9 text-primary-foreground rounded-b-[2rem]">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.25em] text-primary-foreground/70">
-              Panel privado
-            </p>
-            <h1 className="mt-2 font-display text-3xl">Menú - Punto Verde</h1>
-            <p className="mt-1 text-sm text-primary-foreground/80">{items.length} producto(s)</p>
+      <header className="relative overflow-hidden rounded-b-[2rem] bg-deep text-primary-foreground">
+        <img
+          src="/hero-bg.jpg"
+          alt=""
+          aria-hidden
+          className="absolute inset-0 h-full w-full object-cover opacity-60"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-ink/70 via-ink/30 to-ink/85" />
+
+        <div className="relative px-5 pb-8 pt-8">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <img
+                src="/punto-verde-logo.png"
+                alt="Restaurante Punto Verde"
+                className="size-14 rounded-full object-cover shadow-lg ring-2 ring-white/25"
+              />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[#F7C137]">
+                  Panel privado
+                </p>
+                <h1 className="mt-1 font-display text-3xl uppercase leading-none text-white">
+                  Menú
+                </h1>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                to="/tickets"
+                aria-label="Tickets y cierre de caja"
+                className="flex size-10 items-center justify-center rounded-full bg-white/15 backdrop-blur"
+              >
+                <ReceiptText className="size-5" />
+              </Link>
+              <button
+                onClick={onLogout}
+                aria-label="Cerrar sesión"
+                className="flex size-10 items-center justify-center rounded-full bg-white/15 backdrop-blur"
+              >
+                <LogOut className="size-5" />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              to="/tickets"
-              aria-label="Tickets y cierre de caja"
-              className="mt-1 flex size-10 items-center justify-center rounded-full bg-primary-foreground/15 text-primary-foreground"
-            >
-              <ReceiptText className="size-5" />
-            </Link>
-            <button
-              onClick={onLogout}
-              aria-label="Cerrar sesión"
-              className="mt-1 flex size-10 items-center justify-center rounded-full bg-primary-foreground/15"
-            >
-              <LogOut className="size-5" />
-            </button>
-          </div>
+          <p className="mt-4 text-sm text-white/85">{items.length} producto(s)</p>
         </div>
       </header>
 

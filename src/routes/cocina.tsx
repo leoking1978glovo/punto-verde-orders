@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChefHat, Clock, Check } from "lucide-react";
+import { Clock, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type ActiveOrder = {
@@ -78,16 +78,34 @@ function KitchenPage() {
 
   return (
     <div className="min-h-screen bg-background font-sans pb-12">
-      <header className="bg-deep px-5 pb-7 pt-10 text-primary-foreground rounded-b-[2rem]">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-primary-foreground/70">
-          <ChefHat className="size-4" /> Tiempo real
+      <header className="relative overflow-hidden rounded-b-[2rem] bg-deep text-primary-foreground">
+        <img
+          src="/hero-bg.jpg"
+          alt=""
+          aria-hidden
+          className="absolute inset-0 h-full w-full object-cover opacity-60"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-ink/70 via-ink/30 to-ink/85" />
+
+        <div className="relative px-5 pb-8 pt-8">
+          <div className="flex items-center justify-between gap-3">
+            <img
+              src="/punto-verde-logo.png"
+              alt="Restaurante Punto Verde"
+              className="size-14 rounded-full object-cover shadow-lg ring-2 ring-white/25"
+            />
+            <div className="rounded-full bg-white/15 px-4 py-1.5 text-sm backdrop-blur">
+              {orders.length} pedido(s) activo(s)
+            </div>
+          </div>
+
+          <p className="mt-5 text-xs font-semibold uppercase tracking-[0.35em] text-[#F7C137]">
+            Panel de cocina · · Tiempo real
+          </p>
+          <h1 className="mt-2 font-display text-4xl uppercase leading-[0.95] text-white">
+            Cocina
+          </h1>
         </div>
-        <h1 className="mt-3 font-display text-3xl leading-tight">
-          Cocina - Restaurante Punto Verde
-        </h1>
-        <p className="mt-2 text-sm text-primary-foreground/80">
-          {orders.length} pedido(s) activo(s)
-        </p>
       </header>
 
       <main className="px-5">
