@@ -234,33 +234,53 @@ function MenuPage() {
 
   return (
     <div className="min-h-screen bg-background font-sans pb-44">
-      <header className="bg-deep px-5 pb-8 pt-8 text-primary-foreground rounded-b-[2rem]">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-primary-foreground/70">
-              <Leaf className="size-4" />
-              Cocina fresca y natural
+      <header className="relative overflow-hidden rounded-b-[2rem] bg-deep text-primary-foreground">
+        <img
+          src="/hero-bg.jpg"
+          alt=""
+          aria-hidden
+          className="absolute inset-0 h-full w-full object-cover opacity-70"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-ink/70 via-ink/30 to-ink/85" />
+
+        <div className="relative px-5 pb-10 pt-8">
+          <div className="flex items-center justify-between gap-3">
+            <img
+              src="/punto-verde-logo.png"
+              alt="Restaurante Punto Verde"
+              className="size-16 rounded-full object-cover shadow-lg ring-2 ring-white/25"
+            />
+            <button
+              onClick={toggle}
+              aria-label={theme === "dark" ? "Activar tema claro" : "Activar tema oscuro"}
+              className="mt-1 flex size-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
+            >
+              {theme === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
+            </button>
+          </div>
+
+          <h1 className="sr-only">Restaurante Punto Verde</h1>
+          <p className="mt-6 text-xs font-semibold uppercase tracking-[0.35em] text-[#F7C137]">
+            Bienvenidos · · Cocina con alma
+          </p>
+          <p className="mt-2 font-display text-[3.4rem] uppercase leading-[0.95] text-white">
+            Tradición{" "}
+            <span className="bg-[linear-gradient(90deg,#ff6b35,#f7c137)] bg-clip-text text-transparent">
+              y Sabor
+            </span>
+          </p>
+
+          <p className="mt-3 text-sm text-white/85">
+            {tableNumber
+              ? `Estás pidiendo desde la mesa ${tableNumber}.`
+              : "Escanea el código QR de tu mesa para pedir."}
+          </p>
+          {tableNumber && (
+            <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-sm backdrop-blur">
+              Mesa <span className="font-semibold">{tableNumber}</span>
             </div>
-            <h1 className="mt-3 font-display text-[2rem] leading-tight">Restaurante Punto Verde</h1>
-          </div>
-          <button
-            onClick={toggle}
-            aria-label={theme === "dark" ? "Activar tema claro" : "Activar tema oscuro"}
-            className="mt-1 flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-foreground/15 text-primary-foreground"
-          >
-            {theme === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
-          </button>
+          )}
         </div>
-        <p className="mt-2 text-sm text-primary-foreground/80">
-          {tableNumber
-            ? `Estás pidiendo desde la mesa ${tableNumber}.`
-            : "Escanea el código QR de tu mesa para pedir."}
-        </p>
-        {tableNumber && (
-          <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary-foreground/15 px-4 py-1.5 text-sm">
-            Mesa <span className="font-semibold">{tableNumber}</span>
-          </div>
-        )}
       </header>
 
       {categories.length > 0 && (
