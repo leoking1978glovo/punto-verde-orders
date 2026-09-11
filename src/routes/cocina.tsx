@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronDown, ChevronUp, Clock, CookingPot, Settings2 } from "lucide-react";
+import { Check, Clock, CookingPot, Eye, Settings2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type TableInfo = {
@@ -64,7 +64,7 @@ function elapsedLabel(createdAt: string, now: number) {
 function KitchenPage() {
   const queryClient = useQueryClient();
   const [now, setNow] = useState(() => Date.now());
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   // Reloj suave para que el tiempo transcurrido se actualice solo
   useEffect(() => {
@@ -129,77 +129,59 @@ function KitchenPage() {
     [orders, knownNumbers],
   );
 
-  const activeInGrid = tables.filter((t) => orderByTable.has(t.table_number)).length;
-  const freeCount = Math.max(0, tables.length - activeInGrid);
+  const freeCount = Math.max(0, tables.length - orders.length);
+
+  const selectedOrder = useMemo(
+    () => orders.find((o) => o.id === selectedOrderId) ?? null,
+    [orders, selectedOrderId],
+  );
+
+  // Si el pedido seleccionado se cierra o desaparece, cerrar la ventana flotante
+  useEffect(() => {
+    if (selectedOrderId && !selectedOrder) setSelectedOrderId(null);
+  }, [selectedOrderId, selectedOrder]);
 
   async function closeOrder(id: string) {
     await supabase.from("orders").update({ status: "servido" }).eq("id", id);
+    setSelectedOrderId(null);
     queryClient.invalidateQueries({ queryKey: ["active-orders"] });
   }
 
   const renderOrderCard = (order: ActiveOrder, label?: string) => {
     const total = order.order_items.reduce((sum, i) => sum + Number(i.unit_price) * i.quantity, 0);
     const count = order.order_items.reduce((sum, i) => sum + i.quantity, 0);
-    const open = expanded === order.id;
     return (
       <li
         key={order.id}
-        className="rounded-2xl border-2 border-primary bg-card p-4 shadow-sm"
+        className="flex min-h-[8.5rem] flex-col rounded-2xl border-2 border-primary bg-card p-4 shadow-sm"
       >
         <div className="flex items-start justify-between gap-2">
-          <div>
-            <h2 className="font-display text-2xl leading-none">
-              {label ?? `Mesa ${order.table_number}`}
-            </h2>
-            {label && label !== `Mesa ${order.table_number}` && (
-              <p className="mt-0.5 text-xs text-muted-foreground">Mesa {order.table_number}</p>
-            )}
-          </div>
+          <h2 className="font-display text-2xl leading-none">
+            {label ?? `Mesa ${order.table_number}`}
+          </h2>
           <span className="flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
             <Clock className="size-3" />
             {elapsedLabel(order.created_at, now)}
           </span>
         </div>
 
+        {label && label !== `Mesa ${order.table_number}` && (
+          <p className="mt-0.5 text-xs text-muted-foreground">Mesa {order.table_number}</p>
+        )}
+
         <p className="mt-2 text-sm text-muted-foreground">
           {count} ítem(s) ·{" "}
           <span className="font-semibold text-card-foreground">{currency(total)}</span>
         </p>
 
-        {order.order_items.length > 0 && (
+        <div className="mt-auto pt-3">
           <button
-            onClick={() => setExpanded(open ? null : order.id)}
-            className="mt-2 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-primary"
+            onClick={() => setSelectedOrderId(order.id)}
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-2 text-sm font-semibold text-primary-foreground active:scale-[0.99]"
           >
-            {open ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-            {open ? "Ocultar ítems" : "Ver ítems"}
+            <Eye className="size-4" /> Ver pedido
           </button>
-        )}
-
-        {open && (
-          <ul className="mt-2 space-y-1.5 border-t border-border pt-2">
-            {order.order_items.map((item) => (
-              <li key={item.id} className="flex justify-between text-sm">
-                <span className="text-card-foreground">
-                  <span className="mr-2 inline-flex min-w-6 justify-center rounded-md bg-accent px-1.5 font-semibold text-accent-foreground">
-                    {item.quantity}
-                  </span>
-                  {item.name}
-                </span>
-                <span className="text-muted-foreground">
-                  {currency(Number(item.unit_price) * item.quantity)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <button
-          onClick={() => closeOrder(order.id)}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground active:scale-[0.99]"
-        >
-          <Check className="size-4" /> Marcar servido / cerrar
-        </button>
+        </div>
       </li>
     );
   };
@@ -284,13 +266,13 @@ function KitchenPage() {
               return (
                 <li
                   key={table.id}
-                  className="rounded-2xl border border-dashed border-border bg-secondary/40 p-4"
+                  className="flex min-h-[8.5rem] flex-col rounded-2xl border border-dashed border-border bg-secondary/40 p-4"
                 >
                   <p className="font-display text-xl text-muted-foreground">{table.label}</p>
                   <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground/70">
                     Libre
                   </p>
-                  <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground/70">
+                  <div className="mt-auto flex items-center gap-1.5 pt-3 text-xs text-muted-foreground/70">
                     <CookingPot className="size-4" /> Sin pedido
                   </div>
                 </li>
@@ -306,6 +288,72 @@ function KitchenPage() {
           </Link>
         </div>
       </main>
+
+      {selectedOrder && (
+        <div
+          className="fixed inset-0 z-30 flex items-center justify-center bg-ink/60 p-4 backdrop-blur-sm"
+          onClick={() => setSelectedOrderId(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl bg-card p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-display text-3xl leading-none">
+                  Mesa {selectedOrder.table_number}
+                </h2>
+                <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                  <Clock className="size-3" />
+                  {elapsedLabel(selectedOrder.created_at, now)}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedOrderId(null)}
+                aria-label="Cerrar"
+                className="flex size-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <ul className="mt-4 max-h-64 space-y-2 overflow-y-auto border-t border-border pt-4">
+              {selectedOrder.order_items.map((item) => (
+                <li key={item.id} className="flex justify-between text-sm">
+                  <span className="text-card-foreground">
+                    <span className="mr-2 inline-flex min-w-6 justify-center rounded-md bg-accent px-1.5 font-semibold text-accent-foreground">
+                      {item.quantity}
+                    </span>
+                    {item.name}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {currency(Number(item.unit_price) * item.quantity)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-4 flex justify-between border-t border-border pt-3 text-sm font-semibold">
+              <span>Total</span>
+              <span>
+                {currency(
+                  selectedOrder.order_items.reduce(
+                    (sum, i) => sum + Number(i.unit_price) * i.quantity,
+                    0,
+                  ),
+                )}
+              </span>
+            </div>
+
+            <button
+              onClick={() => closeOrder(selectedOrder.id)}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3.5 font-semibold text-primary-foreground active:scale-[0.99]"
+            >
+              <Check className="size-5" /> Marcar servido / cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
