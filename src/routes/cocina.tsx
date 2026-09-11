@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Clock, CookingPot, Eye, Settings2, X } from "lucide-react";
+import { Check, Clock, CookingPot, Eye, Printer, Settings2, X } from "lucide-react";
+import { jsPDF } from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
 
 type TableInfo = {
@@ -61,12 +62,63 @@ function elapsedLabel(createdAt: string, now: number) {
   return `hace ${mins} min`;
 }
 
+function orderTotal(order: ActiveOrder) {
+  return order.order_items.reduce((sum, i) => sum + Number(i.unit_price) * i.quantity, 0);
+}
+
+function downloadTicketPdf(order: ActiveOrder) {
+  const total = orderTotal(order);
+  const doc = new jsPDF({ unit: "mm", format: [80, 140] });
+
+  let y = 12;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.text("Restaurante Punto Verde", 40, y, { align: "center" });
+  y += 6;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text("Cocina fresca y natural", 40, y, { align: "center" });
+  y += 6;
+  doc.line(6, y, 74, y);
+  y += 6;
+
+  doc.setFontSize(10);
+  doc.text(`Mesa: ${order.table_number}`, 6, y);
+  doc.text(
+    new Date(order.created_at).toLocaleString("es-CO", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }),
+    74,
+    y,
+    { align: "right" }
+  );
+  y += 7;
+
+  doc.setFontSize(9);
+  order.order_items.forEach((item) => {
+    const line = `${item.quantity} x ${item.name}`;
+    doc.text(line.substring(0, 32), 6, y);
+    doc.text(currency(Number(item.unit_price) * item.quantity), 74, y, { align: "right" });
+    y += 5;
+  });
+
+  y += 2;
+  doc.line(6, y, 74, y);
+  y += 6;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("TOTAL", 6, y);
+  doc.text(currency(total), 74, y, { align: "right" });
+
+  doc.save(`comanda-mesa${order.table_number}-${order.id.slice(0, 8)}.pdf`);
+}
+
 function KitchenPage() {
   const queryClient = useQueryClient();
   const [now, setNow] = useState(() => Date.now());
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
-  // Reloj suave para que el tiempo transcurrido se actualice solo
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(t);
@@ -122,21 +174,19 @@ function KitchenPage() {
     return map;
   }, [orders]);
 
-  // Pedidos de mesas que ya no están en el grid (p. ej. QR antiguos): se muestran igual
   const knownNumbers = useMemo(() => new Set(tables.map((t) => t.table_number)), [tables]);
   const orphanOrders = useMemo(
     () => orders.filter((o) => !knownNumbers.has(o.table_number)),
-    [orders, knownNumbers],
+    [orders, knownNumbers]
   );
 
   const freeCount = Math.max(0, tables.length - orders.length);
 
   const selectedOrder = useMemo(
     () => orders.find((o) => o.id === selectedOrderId) ?? null,
-    [orders, selectedOrderId],
+    [orders, selectedOrderId]
   );
 
-  // Si el pedido seleccionado se cierra o desaparece, cerrar la ventana flotante
   useEffect(() => {
     if (selectedOrderId && !selectedOrder) setSelectedOrderId(null);
   }, [selectedOrderId, selectedOrder]);
@@ -147,8 +197,18 @@ function KitchenPage() {
     queryClient.invalidateQueries({ queryKey: ["active-orders"] });
   }
 
+  function confirmClose(order: ActiveOrder) {
+    if (
+      window.confirm(
+        `¿Confirmar que la Mesa ${order.table_number} ya fue servida?\n\nEl pedido se cerrará y pasará al historial de tickets.`
+      )
+    ) {
+      closeOrder(order.id);
+    }
+  }
+
   const renderOrderCard = (order: ActiveOrder, label?: string) => {
-    const total = order.order_items.reduce((sum, i) => sum + Number(i.unit_price) * i.quantity, 0);
+    const total = orderTotal(order);
     const count = order.order_items.reduce((sum, i) => sum + i.quantity, 0);
     return (
       <li
@@ -335,22 +395,23 @@ function KitchenPage() {
 
             <div className="mt-4 flex justify-between border-t border-border pt-3 text-sm font-semibold">
               <span>Total</span>
-              <span>
-                {currency(
-                  selectedOrder.order_items.reduce(
-                    (sum, i) => sum + Number(i.unit_price) * i.quantity,
-                    0,
-                  ),
-                )}
-              </span>
+              <span>{currency(orderTotal(selectedOrder))}</span>
             </div>
 
-            <button
-              onClick={() => closeOrder(selectedOrder.id)}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3.5 font-semibold text-primary-foreground active:scale-[0.99]"
-            >
-              <Check className="size-5" /> Marcar servido / cerrar
-            </button>
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={() => downloadTicketPdf(selectedOrder)}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full bg-secondary py-3 text-sm font-semibold text-secondary-foreground active:scale-[0.99]"
+              >
+                <Printer className="size-4" /> Imprimir ticket
+              </button>
+              <button
+                onClick={() => confirmClose(selectedOrder)}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground active:scale-[0.99]"
+              >
+                <Check className="size-4" /> Marcar servido / cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}
