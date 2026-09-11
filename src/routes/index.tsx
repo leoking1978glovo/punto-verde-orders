@@ -63,7 +63,7 @@ const currency = (value: number) =>
 const CATEGORY_ORDER = ["Entradas", "Platos fuertes", "Bebidas", "Postres"];
 
 const TAG_META: Record<string, { icon: typeof Sprout; className: string }> = {
-  Vegano: { icon: Sprout, className: "bg-primary/12 text-primary" },
+  Vegano: { icon: Sprout, className: "bg-[#5F7A3A]/12 text-[#5F7A3A]" },
   "Sin gluten": { icon: WheatOff, className: "bg-accent/30 text-accent-foreground" },
   Picante: { icon: Flame, className: "bg-destructive/12 text-destructive" },
 };
@@ -272,8 +272,8 @@ function MenuPage() {
                   onClick={() => scrollTo(category)}
                   className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                     activeCategory === category
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-secondary-foreground"
+                      ? "bg-[#5F7A3A] text-white"
+                      : "bg-white text-ink border border-ink/20"
                   }`}
                 >
                   {category}
