@@ -62,6 +62,8 @@ export const Route = createFileRoute("/cocina")({
   notFoundComponent: () => <div className="p-8 text-center">Sin pedidos.</div>,
 });
 
+const QUICK_CATEGORY_ORDER = ["Entradas", "Platos fuertes", "Bebidas", "Postres"];
+
 const currency = (value: number) =>
   new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })
     .format(value);
@@ -222,6 +224,18 @@ function KitchenPage() {
     () => orders.filter((o) => !knownNumbers.has(o.table_number)),
     [orders, knownNumbers]
   );
+
+  const quickGroups = useMemo(() => {
+    const map = new Map<string, typeof menuItems>();
+    for (const item of menuItems) {
+      map.set(item.category, [...(map.get(item.category) ?? []), item]);
+    }
+    return [...map.entries()].sort((a, b) => {
+      const ia = QUICK_CATEGORY_ORDER.indexOf(a[0]);
+      const ib = QUICK_CATEGORY_ORDER.indexOf(b[0]);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+  }, [menuItems]);
 
   const freeCount = Math.max(0, tables.length - orders.length);
 
@@ -513,9 +527,15 @@ function KitchenPage() {
             </div>
 
             <ul className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-              {menuItems.map((item) => (
-                <li
-                  key={item.id}
+              {quickGroups.map(([category, list]) => (
+                <li key={category}>
+                  <p className="mb-1.5 mt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground first:mt-0">
+                    {category}
+                  </p>
+                  <ul className="space-y-2">
+                    {list.map((item) => (
+                      <li
+                        key={item.id}
                   className="flex items-center justify-between gap-2 rounded-xl border border-border bg-background px-3 py-2"
                 >
                   <div className="min-w-0">
@@ -555,6 +575,9 @@ function KitchenPage() {
                       <Plus className="size-3.5" />
                     </button>
                   </div>
+                      </li>
+                    ))}
+                  </ul>
                 </li>
               ))}
             </ul>
