@@ -4,6 +4,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen,
   Check,
+  ChevronDown,
+  ChevronUp,
   Clock,
   CookingPot,
   Eye,
@@ -143,6 +145,7 @@ function KitchenPage() {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [menuTable, setMenuTable] = useState<number | null>(null);
   const [menuCart, setMenuCart] = useState<Record<string, number>>({});
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [quickSending, setQuickSending] = useState(false);
 
   useEffect(() => {
@@ -263,6 +266,8 @@ function KitchenPage() {
       closeOrder(order.id);
     }
   }
+
+  const effectiveOpen = openCategory === null ? (quickGroups[0]?.[0] ?? "") : openCategory;
 
   const quickLines = menuItems
     .filter((i) => (menuCart[i.id] ?? 0) > 0)
@@ -529,11 +534,23 @@ function KitchenPage() {
             <ul className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
               {quickGroups.map(([category, list]) => (
                 <li key={category}>
-                  <p className="mb-1.5 mt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground first:mt-0">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenCategory(category === effectiveOpen ? "__none__" : category)
+                    }
+                    className="mb-1.5 mt-2 flex w-full items-center justify-between rounded-lg bg-secondary px-2.5 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-secondary-foreground first:mt-0"
+                  >
                     {category}
-                  </p>
-                  <ul className="space-y-2">
-                    {list.map((item) => (
+                    {category === effectiveOpen ? (
+                      <ChevronUp className="size-3.5" />
+                    ) : (
+                      <ChevronDown className="size-3.5" />
+                    )}
+                  </button>
+                  {category === effectiveOpen && (
+                    <ul className="space-y-2">
+                      {list.map((item) => (
                       <li
                         key={item.id}
                   className="flex items-center justify-between gap-2 rounded-xl border border-border bg-background px-3 py-2"
@@ -576,8 +593,9 @@ function KitchenPage() {
                     </button>
                   </div>
                       </li>
-                    ))}
-                  </ul>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               ))}
             </ul>
