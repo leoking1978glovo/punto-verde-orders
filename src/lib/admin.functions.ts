@@ -210,3 +210,104 @@ export const adminDeleteTable = createServerFn({ method: "POST" })
     if (error) throw error;
     return { ok: true as const };
   });
+
+// ─────────────────────────────────────────────────────────────
+// Categorías del menú (configurables desde el admin)
+// ─────────────────────────────────────────────────────────────
+
+export type AdminCategory = {
+  id: string;
+  name: string;
+  sort_order: number;
+};
+
+export const adminListCategories = createServerFn({ method: "GET" }).handler(
+  async (): Promise<AdminCategory[]> => {
+    await requireUnlocked();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("menu_categories")
+      .select("id, name, sort_order")
+      .order("sort_order");
+    if (error) throw error;
+    return (data ?? []) as AdminCategory[];
+  },
+);
+
+export const adminSaveCategory = createServerFn({ method: "POST" })
+  .inputValidator((data: { id?: string; name: string; sort_order?: number }) => {
+    if (!data.name?.trim()) throw new Error("El nombre es obligatorio");
+    return data;
+  })
+  .handler(async ({ data }) => {
+    await requireUnlocked();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const name = data.name.trim();
+    if (data.id) {
+      // Renombrar: mover también los productos que usan el nombre antiguo
+      const { data: old } = await supabaseAdmin
+        .from("menu_categories")
+        .select("name")
+        .eq("id", data.id)
+        .single();
+      const { error } = await supabaseAdmin
+        .from("menu_categories")
+        .update({ name })
+        .eq("id", data.id);
+      if (error) throw error;
+      if (old && old.name !== name) {
+        const { error: updError } = await supabaseAdmin
+          .from("menu_items")
+          .update({ category: name })
+          .eq("category", old.name);
+        if (updError) throw updError;
+      }
+    } else {
+      const { error } = await supabaseAdmin
+        .from("menu_categories")
+        .insert({ name, sort_order: data.sort_order ?? 0 });
+      if (error) throw error;
+    }
+    return { ok: true as const };
+  });
+
+export const adminDeleteCategory = createServerFn({ method: "POST" })
+  .inputValidator((data: { id: string }) => data)
+  .handler(async ({ data }) => {
+    await requireUnlocked();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: cat } = await supabaseAdmin
+      .from("menu_categories")
+      .select("name")
+      .eq("id", data.id)
+      .single();
+    if (cat) {
+      const { count } = await supabaseAdmin
+        .from("menu_items")
+        .select("id", { count: "exact", head: true })
+        .eq("category", cat.name);
+      if (count && count > 0) {
+        throw new Error(
+          `No se puede eliminar: hay ${count} producto(s) en "${cat.name}". Mueve o elimina esos productos primero.`,
+        );
+      }
+    }
+    const { error } = await supabaseAdmin.from("menu_categories").delete().eq("id", data.id);
+    if (error) throw error;
+    return { ok: true as const };
+  });
+
+export const adminReorderCategories = createServerFn({ method: "POST" })
+  .inputValidator((data: { items: { id: string; sort_order: number }[] }) => data)
+  .handler(async ({ data }) => {
+    await requireUnlocked();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    for (const item of data.items) {
+      const { error } = await supabaseAdmin
+        .from("menu_categories")
+        .update({ sort_order: item.sort_order })
+        .eq("id", item.id);
+      if (error) throw error;
+    }
+    return { ok: true as const };
+  });

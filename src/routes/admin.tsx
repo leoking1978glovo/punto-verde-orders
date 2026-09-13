@@ -11,9 +11,12 @@ import {
   adminSaveItem,
   adminDeleteItem,
   adminToggleAvailable,
+  adminListCategories,
   type AdminMenuItem,
+  type AdminCategory,
 } from "@/lib/admin.functions";
 import { AdminTables } from "@/components/AdminTables";
+import { AdminCategories } from "@/components/AdminCategories";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -38,7 +41,6 @@ export const Route = createFileRoute("/admin")({
   notFoundComponent: () => <div className="p-8 text-center">No disponible.</div>,
 });
 
-const CATEGORIES = ["Entradas", "Platos fuertes", "Bebidas", "Postres"];
 const TAGS = ["Vegano", "Sin gluten", "Picante"];
 
 const currency = (value: number) =>
@@ -57,11 +59,11 @@ type Draft = {
   available: boolean;
 };
 
-const emptyDraft = (): Draft => ({
+const emptyDraft = (category: string): Draft => ({
   name: "",
   description: "",
   price: "",
-  category: CATEGORIES[0] as string,
+  category,
   image_url: "",
   sort_order: "1",
   tags: [],
@@ -175,6 +177,12 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const save = useServerFn(adminSaveItem);
   const remove = useServerFn(adminDeleteItem);
   const toggle = useServerFn(adminToggleAvailable);
+  const listCategories = useServerFn(adminListCategories);
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["admin-categories"],
+    queryFn: () => listCategories({}) as Promise<AdminCategory[]>,
+  });
 
   const { data: items = [], isLoading, error: listError } = useQuery({
     queryKey: ["admin-menu"],
@@ -266,13 +274,15 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
       <main className="px-5">
         <button
-          onClick={() => setDraft(emptyDraft())}
+          onClick={() => setDraft(emptyDraft(categories[0]?.name ?? "General"))}
           className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3.5 font-semibold text-primary-foreground"
         >
           <Plus className="size-5" /> Nuevo producto
         </button>
 
         <AdminTables />
+
+        <AdminCategories />
 
         {isLoading && <p className="py-10 text-center text-muted-foreground">Cargando…</p>}
 
@@ -439,7 +449,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 onChange={(e) => setDraft({ ...draft, category: e.target.value })}
                 className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2.5 font-normal"
               >
-                {CATEGORIES.map((c) => (
+                {[...new Set([...categories.map((c) => c.name), draft.category])].map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>

@@ -64,8 +64,6 @@ export const Route = createFileRoute("/cocina")({
   notFoundComponent: () => <div className="p-8 text-center">Sin pedidos.</div>,
 });
 
-const QUICK_CATEGORY_ORDER = ["Entradas", "Platos fuertes", "Bebidas", "Postres"];
-
 const currency = (value: number) =>
   new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })
     .format(value);
@@ -182,6 +180,18 @@ function KitchenPage() {
     },
   });
 
+  const { data: quickCats = [] } = useQuery({
+    queryKey: ["quick-categories"],
+    queryFn: async (): Promise<{ name: string; sort_order: number }[]> => {
+      const { data, error } = await supabase
+        .from("menu_categories")
+        .select("name, sort_order")
+        .order("sort_order");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["active-orders"],
     queryFn: async (): Promise<ActiveOrder[]> => {
@@ -210,6 +220,10 @@ function KitchenPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => {
         queryClient.invalidateQueries({ queryKey: ["quick-menu"] });
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_categories" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["quick-categories"] });
+        queryClient.invalidateQueries({ queryKey: ["quick-menu"] });
+      })
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -233,12 +247,13 @@ function KitchenPage() {
     for (const item of menuItems) {
       map.set(item.category, [...(map.get(item.category) ?? []), item]);
     }
+    const rank = new Map(quickCats.map((x, i) => [x.name, i]));
     return [...map.entries()].sort((a, b) => {
-      const ia = QUICK_CATEGORY_ORDER.indexOf(a[0]);
-      const ib = QUICK_CATEGORY_ORDER.indexOf(b[0]);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      const ia = rank.get(a[0]);
+      const ib = rank.get(b[0]);
+      return (ia ?? 999) - (ib ?? 999);
     });
-  }, [menuItems]);
+  }, [menuItems, quickCats]);
 
   const freeCount = Math.max(0, tables.length - orders.length);
 

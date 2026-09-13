@@ -46,8 +46,6 @@ const currency = (value: number) =>
   new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })
     .format(value);
 
-const CATEGORY_ORDER = ["Entradas", "Platos fuertes", "Bebidas", "Postres"];
-
 const TAG_META: Record<string, { icon: typeof Sprout; className: string }> = {
   Vegano: { icon: Sprout, className: "bg-[#5F7A3A]/12 text-[#5F7A3A]" },
   "Sin gluten": { icon: WheatOff, className: "bg-accent/30 text-accent-foreground" },
@@ -93,10 +91,26 @@ export function OrderMenu({
     },
   });
 
+  const { data: menuCats = [] } = useQuery({
+    queryKey: ["menu-categories"],
+    queryFn: async (): Promise<{ name: string; sort_order: number }[]> => {
+      const { data, error } = await supabase
+        .from("menu_categories")
+        .select("name, sort_order")
+        .order("sort_order");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   useEffect(() => {
     const channel = supabase
       .channel("menu-cliente")
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["menu"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_categories" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["menu-categories"] });
         queryClient.invalidateQueries({ queryKey: ["menu"] });
       })
       .subscribe();
@@ -110,12 +124,13 @@ export function OrderMenu({
     for (const item of items) {
       map.set(item.category, [...(map.get(item.category) ?? []), item]);
     }
+    const rank = new Map(menuCats.map((c, i) => [c.name, i]));
     return [...map.entries()].sort((a, b) => {
-      const ia = CATEGORY_ORDER.indexOf(a[0]);
-      const ib = CATEGORY_ORDER.indexOf(b[0]);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      const ia = rank.get(a[0]);
+      const ib = rank.get(b[0]);
+      return (ia ?? 999) - (ib ?? 999);
     });
-  }, [items]);
+  }, [items, menuCats]);
 
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
