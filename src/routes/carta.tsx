@@ -350,7 +350,7 @@ function CartaPage() {
                         <button
                           aria-label={`Agregar ${item.name}`}
                           onClick={() => add(item.id, 1)}
-                          className="flex size-9 items-center justify-center rounded-full bg-foreground text-background transition-transform active:scale-95"
+                          className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:scale-95"
                         >
                           <Plus className="size-4" />
                         </button>
