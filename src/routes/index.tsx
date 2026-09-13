@@ -4,14 +4,22 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
   ChevronRight,
+  Facebook,
   Flame,
+  Instagram,
   Leaf,
+  MapPin,
   Minus,
   Moon,
+  Navigation,
+  Phone,
   Plus,
+  Share2,
   ShoppingBag,
   Sprout,
   Sun,
+  Twitter,
+  Wifi,
   WheatOff,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,6 +68,21 @@ export const Route = createFileRoute("/")({
   ),
   notFoundComponent: () => <div className="p-8 text-center">Menú no disponible.</div>,
 });
+
+// ─────────────────────────────────────────────────────────────
+// DATOS DEL RESTAURANTE — edita solo aquí
+// ─────────────────────────────────────────────────────────────
+const RESTAURANT = {
+  name: "Restaurante Punto Verde",
+  tagline: "Cocina fresca, natural y de temporada.",
+  address: "C. Miguel Rúa, Almería",
+  phone: "+34000000000", // ← pon aquí tu teléfono real (con prefijo, sin espacios)
+  wifiName: "PuntoVerde", // ← nombre de tu wifi
+  wifiPassword: "contraseña", // ← contraseña del wifi
+  mapsUrl:
+    "https://www.google.com/maps/search/?api=1&query=Calle+Miguel+Rua+Almeria",
+  social: { facebook: "#", instagram: "#", twitter: "#" }, // ← tus perfiles
+};
 
 const currency = (value: number) =>
   new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })
@@ -227,6 +250,24 @@ function MenuPage() {
     }
   }
 
+  async function shareRestaurant() {
+    const url = window.location.origin;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: RESTAURANT.name, url });
+      } catch {
+        // el usuario canceló
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+        window.alert("Enlace copiado: " + url);
+      } catch {
+        window.alert("Copia este enlace: " + url);
+      }
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background font-sans">
       {/* Foto del restaurante */}
@@ -245,12 +286,21 @@ function MenuPage() {
         </button>
       </div>
 
+      {/* Logo centrado sobre la foto */}
+      <div className="relative z-10 mx-auto -mt-16 w-fit">
+        <img
+          src="/punto-verde-logo.png"
+          alt={RESTAURANT.name}
+          className="size-32 rounded-full object-cover shadow-2xl ring-4 ring-background"
+        />
+      </div>
+
       {/* Nombre y bienvenida */}
-      <div className="px-6 pt-6 text-center">
+      <div className="px-6 pt-4 text-center">
         <h1 className="font-display text-4xl font-bold uppercase text-foreground">
-          Restaurante Punto Verde
+          {RESTAURANT.name}
         </h1>
-        <p className="mt-3 text-lg text-muted-foreground">Cocina fresca, natural y de temporada.</p>
+        <p className="mt-3 text-lg text-muted-foreground">{RESTAURANT.tagline}</p>
         <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
           ¡Bienvenidos! Escoge una categoría para ver nuestros platos.
         </p>
@@ -360,14 +410,73 @@ function MenuPage() {
         </section>
       )}
 
-      <div className="mt-10 flex justify-center gap-6 pb-12">
-        <Link to="/cocina" className="text-xs uppercase tracking-widest text-muted-foreground">
-          Cocina
-        </Link>
-        <Link to="/admin" className="text-xs uppercase tracking-widest text-muted-foreground">
-          Administración
-        </Link>
-      </div>
+      {/* Dirección, wifi y contacto */}
+      <footer className="mt-12 border-t border-border px-6 pb-10 pt-8 text-center">
+        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <MapPin className="size-4 shrink-0" />
+          <span>{RESTAURANT.address}</span>
+        </div>
+        <div className="mt-2 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <Wifi className="size-4 shrink-0" />
+          <span>
+            Wifi <b>{RESTAURANT.wifiName}</b> · contraseña: {RESTAURANT.wifiPassword}
+          </span>
+        </div>
+
+        <div className="mx-auto mt-6 grid max-w-md grid-cols-3 gap-3">
+          <a
+            href={`tel:${RESTAURANT.phone}`}
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-border py-3 text-sm font-semibold text-foreground active:scale-[0.98]"
+          >
+            <Phone className="size-4" /> Llamar
+          </a>
+          <a
+            href={RESTAURANT.mapsUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-border py-3 text-sm font-semibold text-foreground active:scale-[0.98]"
+          >
+            <Navigation className="size-4" /> Cómo llegar
+          </a>
+          <button
+            onClick={shareRestaurant}
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-border py-3 text-sm font-semibold text-foreground active:scale-[0.98]"
+          >
+            <Share2 className="size-4" /> Compartir
+          </button>
+        </div>
+
+        <div className="mt-6 flex justify-center gap-5 text-muted-foreground">
+          <a href={RESTAURANT.social.facebook} aria-label="Facebook" className="hover:text-foreground">
+            <Facebook className="size-5" />
+          </a>
+          <a href={RESTAURANT.social.instagram} aria-label="Instagram" className="hover:text-foreground">
+            <Instagram className="size-5" />
+          </a>
+          <a href={RESTAURANT.social.twitter} aria-label="Twitter" className="hover:text-foreground">
+            <Twitter className="size-5" />
+          </a>
+        </div>
+
+        <p className="mt-6 text-xs text-muted-foreground">
+          Copyright {new Date().getFullYear()} © {RESTAURANT.name}
+        </p>
+
+        <div className="mt-4 flex justify-center gap-6">
+          <Link
+            to="/cocina"
+            className="text-[10px] uppercase tracking-widest text-muted-foreground/60"
+          >
+            Cocina
+          </Link>
+          <Link
+            to="/admin"
+            className="text-[10px] uppercase tracking-widest text-muted-foreground/60"
+          >
+            Administración
+          </Link>
+        </div>
+      </footer>
 
       {/* Confirmación */}
       {confirmed && (
