@@ -236,6 +236,12 @@ function KitchenPage() {
     return map;
   }, [orders]);
 
+  // Cola de cocina: el primero que pidió va el primero
+  const queue = useMemo(
+    () => [...orders].sort((a, b) => a.created_at.localeCompare(b.created_at)),
+    [orders],
+  );
+
   const knownNumbers = useMemo(() => new Set(tables.map((t) => t.table_number)), [tables]);
   const orphanOrders = useMemo(
     () => orders.filter((o) => !knownNumbers.has(o.table_number)),
@@ -465,6 +471,31 @@ function KitchenPage() {
             >
               Ir a Administración
             </Link>
+          </div>
+        )}
+
+        {/* Cola de pedidos: por orden de llegada */}
+        {queue.length > 0 && (
+          <div className="mt-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Cola · por orden de llegada
+            </p>
+            <ul className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+              {queue.map((o, i) => (
+                <li
+                  key={o.id}
+                  className="flex shrink-0 items-center gap-2 rounded-full border border-primary bg-card px-3 py-1.5 text-sm text-card-foreground"
+                >
+                  <span className="flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+                    {i + 1}
+                  </span>
+                  Mesa {o.table_number}
+                  <span className="text-xs text-muted-foreground">
+                    {elapsedLabel(o.created_at, now)}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
