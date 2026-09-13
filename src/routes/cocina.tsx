@@ -230,6 +230,26 @@ function KitchenPage() {
     };
   }, [queryClient]);
 
+  // Respaldo: aunque el tiempo real falle (pestaña en segundo plano, PC suspendido),
+  // los contadores y tarjetas se actualizan solos cada 10 s y al volver a la pestaña.
+  useEffect(() => {
+    const refresh = () => {
+      queryClient.invalidateQueries({ queryKey: ["active-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["tables"] });
+    };
+    const interval = setInterval(refresh, 10000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", refresh);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [queryClient]);
+
   const orderByTable = useMemo(() => {
     const map = new Map<number, ActiveOrder>();
     for (const o of orders) map.set(o.table_number, o);
