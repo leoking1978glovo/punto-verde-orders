@@ -36,6 +36,8 @@ type ActiveOrder = {
   id: string;
   table_number: number;
   created_at: string;
+  items_updated_at: string | null;
+  kitchen_seen_at: string | null;
   order_items: OrderItem[];
 };
 
@@ -73,6 +75,13 @@ function elapsedLabel(createdAt: string, now: number) {
   if (mins < 1) return "ahora mismo";
   if (mins === 1) return "hace 1 min";
   return `hace ${mins} min`;
+}
+
+function hasNews(order: ActiveOrder) {
+  return (
+    !!order.items_updated_at &&
+    (!order.kitchen_seen_at || order.items_updated_at > order.kitchen_seen_at)
+  );
 }
 
 function orderTotal(order: ActiveOrder) {
@@ -197,7 +206,9 @@ function KitchenPage() {
     queryFn: async (): Promise<ActiveOrder[]> => {
       const { data, error } = await supabase
         .from("orders")
-        .select("id, table_number, created_at, order_items(id, name, quantity, unit_price)")
+        .select(
+          "id, table_number, created_at, items_updated_at, kitchen_seen_at, order_items(id, name, quantity, unit_price)"
+        )
         .eq("status", "activo")
         .order("created_at");
       if (error) throw error;
@@ -292,6 +303,17 @@ function KitchenPage() {
     if (selectedOrderId && !selectedOrder) setSelectedOrderId(null);
   }, [selectedOrderId, selectedOrder]);
 
+  async function openOrder(order: ActiveOrder) {
+    setSelectedOrderId(order.id);
+    if (hasNews(order)) {
+      await supabase
+        .from("orders")
+        .update({ kitchen_seen_at: order.items_updated_at })
+        .eq("id", order.id);
+      queryClient.invalidateQueries({ queryKey: ["active-orders"] });
+    }
+  }
+
   async function closeOrder(id: string) {
     await supabase.from("orders").update({ status: "servido" }).eq("id", id);
     setSelectedOrderId(null);
@@ -328,6 +350,7 @@ function KitchenPage() {
         .maybeSingle();
       if (findError) throw findError;
 
+      const wasExisting = !!existing?.id;
       let orderId = existing?.id ?? null;
       if (!orderId) {
         const { data: created, error: createError } = await supabase
@@ -365,7 +388,14 @@ function KitchenPage() {
         }
       }
 
-      await supabase.from("orders").update({ status: "activo" }).eq("id", orderId);
+      await supabase
+        .from("orders")
+        .update(
+          wasExisting
+            ? { status: "activo", items_updated_at: new Date().toISOString() }
+            : { status: "activo" },
+        )
+        .eq("id", orderId);
       queryClient.invalidateQueries({ queryKey: ["active-orders"] });
       setMenuCart({});
       setMenuTable(null);
@@ -380,8 +410,16 @@ function KitchenPage() {
     return (
       <li
         key={order.id}
-        className="flex min-h-[8.5rem] flex-col rounded-2xl border-2 border-primary bg-card p-4 shadow-sm"
+        className="relative flex min-h-[8.5rem] flex-col rounded-2xl border-2 border-primary bg-card p-4 shadow-sm"
       >
+        {hasNews(order) && (
+          <span
+            aria-label="Se añadieron platos a este pedido"
+            className="absolute -right-1.5 -top-1.5 z-10 flex size-5 animate-pulse items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white ring-2 ring-background"
+          >
+            !
+          </span>
+        )}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
             <h2 className="font-display text-2xl leading-none">
@@ -412,7 +450,7 @@ function KitchenPage() {
 
         <div className="mt-auto pt-3">
           <button
-            onClick={() => setSelectedOrderId(order.id)}
+            onClick={() => openOrder(order)}
             className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-2 text-sm font-semibold text-primary-foreground active:scale-[0.99]"
           >
             <Eye className="size-4" /> Ver pedido

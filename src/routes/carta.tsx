@@ -172,7 +172,7 @@ function CartaPage() {
   // ── Carrito (solo con mesa) ──
   const [cart, setCart] = useState<Record<string, number>>({});
   const [sending, setSending] = useState(false);
-  const [confirmed, setConfirmed] = useState<null | { total: number; count: number }>(null);
+  const [confirmed, setConfirmed] = useState<null | { total: number; count: number; ahead: number }>(null);
   const [error, setError] = useState<string | null>(null);
 
   const cartLines = items
@@ -203,6 +203,7 @@ function CartaPage() {
         .maybeSingle();
       if (findError) throw findError;
 
+      const wasExisting = !!existing?.id;
       let orderId = existing?.id ?? null;
       if (!orderId) {
         const { data: created, error: createError } = await supabase
@@ -240,9 +241,33 @@ function CartaPage() {
         }
       }
 
-      await supabase.from("orders").update({ status: "activo" }).eq("id", orderId);
+      await supabase
+        .from("orders")
+        .update(
+          wasExisting
+            ? { status: "activo", items_updated_at: new Date().toISOString() }
+            : { status: "activo" },
+        )
+        .eq("id", orderId);
 
-      setConfirmed({ total, count });
+      // ¿Cuántos pedidos activos hay por delante de este?
+      const { data: mine } = await supabase
+        .from("orders")
+        .select("created_at, items_updated_at")
+        .eq("id", orderId)
+        .single();
+      const { data: actives } = await supabase
+        .from("orders")
+        .select("table_number, created_at, items_updated_at")
+        .eq("status", "activo");
+      const keyOf = (o: { created_at: string; items_updated_at: string | null }) =>
+        o.items_updated_at ?? o.created_at;
+      const myKey = mine ? keyOf(mine) : new Date().toISOString();
+      const ahead = (actives ?? []).filter(
+        (o) => o.table_number !== tableNumber && keyOf(o) < myKey,
+      ).length;
+
+      setConfirmed({ total, count, ahead });
       setCart({});
     } catch (e) {
       setError(e instanceof Error ? e.message : "No pudimos enviar tu pedido.");
@@ -396,10 +421,18 @@ function CartaPage() {
               <Check className="size-7" />
             </div>
             <h2 className="mt-4 font-display text-2xl">¡Pedido enviado!</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {confirmed.count} ítem(s) por {currency(confirmed.total)} se sumaron al pedido de la
-              mesa {tableNumber}. La cocina ya lo está viendo.
-            </p>
+            {confirmed.ahead > 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                {confirmed.count} ítem(s) por {currency(confirmed.total)} se sumaron a tu pedido.
+                Hay clientes por delante de ti: debes esperar un poco, la cocina lo preparará en
+                cuanto termine los pedidos anteriores. Gracias por tu paciencia.
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">
+                {confirmed.count} ítem(s) por {currency(confirmed.total)} se sumaron a tu pedido.
+                ¡El tuyo es el siguiente en la cocina!
+              </p>
+            )}
             <button
               onClick={() => setConfirmed(null)}
               className="mt-5 w-full rounded-full bg-foreground py-3 font-semibold text-background"

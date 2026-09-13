@@ -123,6 +123,8 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          items_updated_at: string | null
+          kitchen_seen_at: string | null
           status: string
           table_number: number
           updated_at: string
@@ -130,6 +132,8 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          items_updated_at?: string | null
+          kitchen_seen_at?: string | null
           status?: string
           table_number: number
           updated_at?: string
@@ -137,6 +141,8 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          items_updated_at?: string | null
+          kitchen_seen_at?: string | null
           status?: string
           table_number?: number
           updated_at?: string
