@@ -1,40 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Check,
-  ChevronRight,
-  Facebook,
-  Flame,
-  Instagram,
-  Leaf,
-  MapPin,
-  Minus,
-  Moon,
-  Navigation,
-  Phone,
-  Plus,
-  Share2,
-  ShoppingBag,
-  Sprout,
-  Sun,
-  Twitter,
-  Wifi,
-  WheatOff,
-} from "lucide-react";
+import { ChevronRight, Moon, Sun } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTheme } from "@/lib/theme";
-
-type MenuItem = {
-  id: string;
-  category: string;
-  name: string;
-  description: string;
-  price: number;
-  sort_order: number;
-  image_url: string;
-  tags: string[];
-};
+import { RESTAURANT } from "@/lib/restaurant";
+import { RestaurantFooter } from "@/components/RestaurantFooter";
 
 type CategoryLite = {
   name: string;
@@ -60,71 +31,21 @@ export const Route = createFileRoute("/")({
       },
     ],
   }),
-  component: MenuPage,
+  component: HomePage,
   errorComponent: ({ error }) => (
     <div role="alert" className="p-8 text-center text-sm text-muted-foreground">
       No pudimos cargar el menú: {error.message}
     </div>
   ),
-  notFoundComponent: () => <div className="p-8 text-center">Menú no disponible.</div>,
 });
 
-// ─────────────────────────────────────────────────────────────
-// DATOS DEL RESTAURANTE — edita solo aquí
-// ─────────────────────────────────────────────────────────────
-const RESTAURANT = {
-  name: "Restaurante Punto Verde",
-  tagline: "Cocina fresca, natural y de temporada.",
-  address: "C. Miguel Rúa, Almería",
-  phone: "+34000000000", // ← pon aquí tu teléfono real (con prefijo, sin espacios)
-  wifiName: "PuntoVerde", // ← nombre de tu wifi
-  wifiPassword: "contraseña", // ← contraseña del wifi
-  mapsUrl:
-    "https://www.google.com/maps/search/?api=1&query=Calle+Miguel+Rua+Almeria",
-  social: { facebook: "#", instagram: "#", twitter: "#" }, // ← tus perfiles
-};
-
-const currency = (value: number) =>
-  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })
-    .format(value);
-
-const TAG_META: Record<string, { icon: typeof Sprout; className: string }> = {
-  Vegano: { icon: Sprout, className: "text-[#5F7A3A]" },
-  "Sin gluten": { icon: WheatOff, className: "text-[#C2703D]" },
-  Picante: { icon: Flame, className: "text-destructive" },
-};
-
-function TagChip({ tag }: { tag: string }) {
-  const meta = TAG_META[tag];
-  const Icon = meta?.icon ?? Leaf;
-  return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
-      <Icon className={`size-4 ${meta?.className ?? ""}`} />
-      {tag}
-    </span>
-  );
-}
-
-function MenuPage() {
+function HomePage() {
   const { mesa } = Route.useSearch();
   const tableNumber = mesa && /^\d+$/.test(mesa) ? Number(mesa) : null;
   const { theme, toggle } = useTheme();
   const queryClient = useQueryClient();
 
-  const { data: items = [], isLoading } = useQuery({
-    queryKey: ["menu"],
-    queryFn: async (): Promise<MenuItem[]> => {
-      const { data, error } = await supabase
-        .from("menu_items")
-        .select("id, category, name, description, price, sort_order, image_url, tags")
-        .eq("available", true)
-        .order("sort_order");
-      if (error) throw error;
-      return (data ?? []).map((d) => ({ ...d, price: Number(d.price) }));
-    },
-  });
-
-  const { data: menuCats = [] } = useQuery({
+  const { data: menuCats = [], isLoading } = useQuery({
     queryKey: ["menu-categories"],
     queryFn: async (): Promise<CategoryLite[]> => {
       const { data, error } = await supabase
@@ -138,13 +59,9 @@ function MenuPage() {
 
   useEffect(() => {
     const channel = supabase
-      .channel("menu-cliente")
-      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => {
-        queryClient.invalidateQueries({ queryKey: ["menu"] });
-      })
+      .channel("home-categories")
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_categories" }, () => {
         queryClient.invalidateQueries({ queryKey: ["menu-categories"] });
-        queryClient.invalidateQueries({ queryKey: ["menu"] });
       })
       .subscribe();
     return () => {
@@ -152,129 +69,13 @@ function MenuPage() {
     };
   }, [queryClient]);
 
-  const groups = useMemo(() => {
-    const map = new Map<string, MenuItem[]>();
-    for (const item of items) {
-      map.set(item.category, [...(map.get(item.category) ?? []), item]);
-    }
-    const rank = new Map(menuCats.map((c, i) => [c.name, i]));
-    return [...map.entries()].sort((a, b) => {
-      const ia = rank.get(a[0]);
-      const ib = rank.get(b[0]);
-      return (ia ?? 999) - (ib ?? 999);
-    });
-  }, [items, menuCats]);
-
-  const [selected, setSelected] = useState<string | null>(null);
-  const activeCategory = selected ?? groups[0]?.[0] ?? null;
-
-  // ── Carrito (solo cuando hay mesa) ──
-  const [cart, setCart] = useState<Record<string, number>>({});
-  const [sending, setSending] = useState(false);
-  const [confirmed, setConfirmed] = useState<null | { total: number; count: number }>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const cartLines = items
-    .filter((i) => (cart[i.id] ?? 0) > 0)
-    .map((i) => ({ item: i, qty: cart[i.id] as number }));
-  const total = cartLines.reduce((sum, l) => sum + l.item.price * l.qty, 0);
-  const count = cartLines.reduce((sum, l) => sum + l.qty, 0);
-
-  const add = (id: string, delta: number) =>
-    setCart((prev) => {
-      const next = Math.max(0, (prev[id] ?? 0) + delta);
-      const copy = { ...prev };
-      if (next === 0) delete copy[id];
-      else copy[id] = next;
-      return copy;
-    });
-
-  async function confirmOrder() {
-    if (!tableNumber || cartLines.length === 0) return;
-    setSending(true);
-    setError(null);
-    try {
-      const { data: existing, error: findError } = await supabase
-        .from("orders")
-        .select("id")
-        .eq("table_number", tableNumber)
-        .eq("status", "activo")
-        .maybeSingle();
-      if (findError) throw findError;
-
-      let orderId = existing?.id ?? null;
-      if (!orderId) {
-        const { data: created, error: createError } = await supabase
-          .from("orders")
-          .insert({ table_number: tableNumber, status: "activo" })
-          .select("id")
-          .single();
-        if (createError) throw createError;
-        orderId = created.id;
-      }
-
-      const { data: currentItems, error: itemsError } = await supabase
-        .from("order_items")
-        .select("id, menu_item_id, quantity")
-        .eq("order_id", orderId);
-      if (itemsError) throw itemsError;
-
-      for (const line of cartLines) {
-        const match = (currentItems ?? []).find((ci) => ci.menu_item_id === line.item.id);
-        if (match) {
-          const { error: updError } = await supabase
-            .from("order_items")
-            .update({ quantity: match.quantity + line.qty })
-            .eq("id", match.id);
-          if (updError) throw updError;
-        } else {
-          const { error: insError } = await supabase.from("order_items").insert({
-            order_id: orderId,
-            menu_item_id: line.item.id,
-            name: line.item.name,
-            unit_price: line.item.price,
-            quantity: line.qty,
-          });
-          if (insError) throw insError;
-        }
-      }
-
-      await supabase.from("orders").update({ status: "activo" }).eq("id", orderId);
-
-      setConfirmed({ total, count });
-      setCart({});
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No pudimos enviar tu pedido.");
-    } finally {
-      setSending(false);
-    }
-  }
-
-  async function shareRestaurant() {
-    const url = window.location.origin;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: RESTAURANT.name, url });
-      } catch {
-        // el usuario canceló
-      }
-    } else {
-      try {
-        await navigator.clipboard.writeText(url);
-        window.alert("Enlace copiado: " + url);
-      } catch {
-        window.alert("Copia este enlace: " + url);
-      }
-    }
-  }
-
   return (
     <div className="min-h-screen bg-background font-sans">
       {/* Foto del restaurante */}
       <div className="relative h-64 w-full">
         <img
           src="/hero-bg.jpg"
-          alt="Restaurante Punto Verde"
+          alt={RESTAURANT.name}
           className="h-full w-full object-cover"
         />
         <button
@@ -302,7 +103,7 @@ function MenuPage() {
         </h1>
         <p className="mt-3 text-lg text-muted-foreground">{RESTAURANT.tagline}</p>
         <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-          ¡Bienvenidos! Escoge una categoría para ver nuestros platos.
+          ¡Bienvenidos! Escoge una categoría para ver nuestra carta.
         </p>
         {tableNumber ? (
           <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-1.5 text-sm font-semibold text-background">
@@ -315,218 +116,27 @@ function MenuPage() {
         )}
       </div>
 
-      {/* Botones de categorías */}
+      {/* Botones de categorías → abren la página de la carta */}
       <div className="mt-8 space-y-3 px-5">
-        {isLoading && <p className="py-4 text-center text-muted-foreground">Cargando menú…</p>}
+        {isLoading && <p className="py-4 text-center text-muted-foreground">Cargando…</p>}
 
-        {groups.map(([category]) => {
-          const open = category === activeCategory;
-          return (
-            <button
-              key={category}
-              onClick={() => setSelected(open ? null : category)}
-              className={`flex w-full items-center justify-between rounded-2xl px-6 py-4 text-left font-display text-xl font-bold uppercase tracking-wide transition-colors ${
-                open
-                  ? "bg-foreground text-background"
-                  : "bg-muted text-foreground hover:bg-muted/70"
-              }`}
-            >
-              {category}
-              <ChevronRight className={`size-6 transition-transform ${open ? "rotate-90" : ""}`} />
-            </button>
-          );
-        })}
+        {menuCats.map((cat) => (
+          <Link
+            key={cat.name}
+            to="/carta"
+            search={{
+              categoria: cat.name,
+              ...(tableNumber ? { mesa: String(tableNumber) } : {}),
+            }}
+            className="flex w-full items-center justify-between rounded-2xl bg-muted px-6 py-4 font-display text-xl font-bold uppercase tracking-wide text-foreground transition-colors hover:bg-muted/70"
+          >
+            {cat.name}
+            <ChevronRight className="size-6" />
+          </Link>
+        ))}
       </div>
 
-      {/* Platos de la categoría elegida */}
-      {activeCategory && (
-        <section className="mt-8 px-5">
-          <h2 className="font-display text-3xl font-bold text-foreground">{activeCategory}</h2>
-          <div className="mt-1 h-px w-16 bg-clay" />
-
-          <ul className="mt-2 divide-y divide-border">
-            {(groups.find(([c]) => c === activeCategory)?.[1] ?? []).map((item) => (
-              <li key={item.id} className="flex items-start gap-4 py-5">
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-xl font-bold text-card-foreground">{item.name}</h3>
-                  {item.description && (
-                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                      {item.description}
-                    </p>
-                  )}
-                  {item.tags?.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                      {item.tags.map((tag) => (
-                        <TagChip key={tag} tag={tag} />
-                      ))}
-                    </div>
-                  )}
-                  <p className="mt-2 font-display text-lg font-semibold text-primary">
-                    {currency(item.price)}
-                  </p>
-
-                  {tableNumber && (
-                    <div className="mt-3 flex items-center gap-3">
-                      {(cart[item.id] ?? 0) > 0 && (
-                        <>
-                          <button
-                            aria-label={`Quitar ${item.name}`}
-                            onClick={() => add(item.id, -1)}
-                            className="flex size-9 items-center justify-center rounded-full border border-border text-foreground active:scale-95"
-                          >
-                            <Minus className="size-4" />
-                          </button>
-                          <span className="w-4 text-center font-semibold">{cart[item.id]}</span>
-                        </>
-                      )}
-                      <button
-                        aria-label={`Agregar ${item.name}`}
-                        onClick={() => add(item.id, 1)}
-                        className="flex size-9 items-center justify-center rounded-full bg-foreground text-background transition-transform active:scale-95"
-                      >
-                        <Plus className="size-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {item.image_url ? (
-                  <img
-                    src={item.image_url}
-                    alt={item.name}
-                    loading="lazy"
-                    width={768}
-                    height={576}
-                    className="size-28 shrink-0 rounded-2xl object-cover"
-                  />
-                ) : (
-                  <div className="flex size-28 shrink-0 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-                    <Leaf className="size-6" />
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {/* Dirección, wifi y contacto */}
-      <footer className="mt-12 border-t border-border px-6 pb-10 pt-8 text-center">
-        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          <MapPin className="size-4 shrink-0" />
-          <span>{RESTAURANT.address}</span>
-        </div>
-        <div className="mt-2 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          <Wifi className="size-4 shrink-0" />
-          <span>
-            Wifi <b>{RESTAURANT.wifiName}</b> · contraseña: {RESTAURANT.wifiPassword}
-          </span>
-        </div>
-
-        <div className="mx-auto mt-6 grid max-w-md grid-cols-3 gap-3">
-          <a
-            href={`tel:${RESTAURANT.phone}`}
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-border py-3 text-sm font-semibold text-foreground active:scale-[0.98]"
-          >
-            <Phone className="size-4" /> Llamar
-          </a>
-          <a
-            href={RESTAURANT.mapsUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-border py-3 text-sm font-semibold text-foreground active:scale-[0.98]"
-          >
-            <Navigation className="size-4" /> Cómo llegar
-          </a>
-          <button
-            onClick={shareRestaurant}
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-border py-3 text-sm font-semibold text-foreground active:scale-[0.98]"
-          >
-            <Share2 className="size-4" /> Compartir
-          </button>
-        </div>
-
-        <div className="mt-6 flex justify-center gap-5 text-muted-foreground">
-          <a href={RESTAURANT.social.facebook} aria-label="Facebook" className="hover:text-foreground">
-            <Facebook className="size-5" />
-          </a>
-          <a href={RESTAURANT.social.instagram} aria-label="Instagram" className="hover:text-foreground">
-            <Instagram className="size-5" />
-          </a>
-          <a href={RESTAURANT.social.twitter} aria-label="Twitter" className="hover:text-foreground">
-            <Twitter className="size-5" />
-          </a>
-        </div>
-
-        <p className="mt-6 text-xs text-muted-foreground">
-          Copyright {new Date().getFullYear()} © {RESTAURANT.name}
-        </p>
-
-        <div className="mt-4 flex justify-center gap-6">
-          <Link
-            to="/cocina"
-            className="text-[10px] uppercase tracking-widest text-muted-foreground/60"
-          >
-            Cocina
-          </Link>
-          <Link
-            to="/admin"
-            className="text-[10px] uppercase tracking-widest text-muted-foreground/60"
-          >
-            Administración
-          </Link>
-        </div>
-      </footer>
-
-      {/* Confirmación */}
-      {confirmed && (
-        <div className="fixed inset-0 z-20 flex items-end bg-foreground/40 p-4">
-          <div className="w-full rounded-3xl bg-card p-6 text-center">
-            <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground">
-              <Check className="size-7" />
-            </div>
-            <h2 className="mt-4 font-display text-2xl">¡Pedido enviado!</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {confirmed.count} ítem(s) por {currency(confirmed.total)} se sumaron al pedido de la
-              mesa {tableNumber}. La cocina ya lo está viendo.
-            </p>
-            <button
-              onClick={() => setConfirmed(null)}
-              className="mt-5 w-full rounded-full bg-foreground py-3 font-semibold text-background"
-            >
-              Seguir pidiendo
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Barra del carrito */}
-      {tableNumber && count > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 p-4 backdrop-blur">
-          <div className="mb-3 max-h-32 space-y-1 overflow-y-auto text-sm">
-            {cartLines.map((l) => (
-              <div key={l.item.id} className="flex justify-between text-muted-foreground">
-                <span>
-                  {l.qty} × {l.item.name}
-                </span>
-                <span>{currency(l.qty * l.item.price)}</span>
-              </div>
-            ))}
-          </div>
-          {error && <p className="mb-2 text-sm text-destructive">{error}</p>}
-          <button
-            disabled={sending}
-            onClick={confirmOrder}
-            className="flex w-full items-center justify-between rounded-full bg-foreground px-6 py-4 font-semibold text-background disabled:opacity-50"
-          >
-            <span className="flex items-center gap-2">
-              <ShoppingBag className="size-5" />
-              {sending ? "Enviando…" : `Confirmar pedido (${count})`}
-            </span>
-            <span>{currency(total)}</span>
-          </button>
-        </div>
-      )}
+      <RestaurantFooter />
     </div>
   );
 }
