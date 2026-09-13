@@ -1,18 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Check,
+  ChevronRight,
+  Flame,
   Leaf,
   Minus,
+  Moon,
   Plus,
   ShoppingBag,
-  Check,
-  ChefHat,
-  Flame,
   Sprout,
-  WheatOff,
-  Moon,
   Sun,
+  WheatOff,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTheme } from "@/lib/theme";
@@ -26,6 +26,11 @@ type MenuItem = {
   sort_order: number;
   image_url: string;
   tags: string[];
+};
+
+type CategoryLite = {
+  name: string;
+  sort_order: number;
 };
 
 export const Route = createFileRoute("/")({
@@ -60,24 +65,18 @@ const currency = (value: number) =>
   new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })
     .format(value);
 
-const CATEGORY_ORDER = ["Entradas", "Platos fuertes", "Bebidas", "Postres"];
-
 const TAG_META: Record<string, { icon: typeof Sprout; className: string }> = {
-  Vegano: { icon: Sprout, className: "bg-[#5F7A3A]/12 text-[#5F7A3A]" },
-  "Sin gluten": { icon: WheatOff, className: "bg-accent/30 text-accent-foreground" },
-  Picante: { icon: Flame, className: "bg-destructive/12 text-destructive" },
+  Vegano: { icon: Sprout, className: "text-[#5F7A3A]" },
+  "Sin gluten": { icon: WheatOff, className: "text-[#C2703D]" },
+  Picante: { icon: Flame, className: "text-destructive" },
 };
 
 function TagChip({ tag }: { tag: string }) {
   const meta = TAG_META[tag];
   const Icon = meta?.icon ?? Leaf;
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-        meta?.className ?? "bg-muted text-muted-foreground"
-      }`}
-    >
-      <Icon className="size-3" />
+    <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
+      <Icon className={`size-4 ${meta?.className ?? ""}`} />
       {tag}
     </span>
   );
@@ -102,10 +101,26 @@ function MenuPage() {
     },
   });
 
+  const { data: menuCats = [] } = useQuery({
+    queryKey: ["menu-categories"],
+    queryFn: async (): Promise<CategoryLite[]> => {
+      const { data, error } = await supabase
+        .from("menu_categories")
+        .select("name, sort_order")
+        .order("sort_order");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   useEffect(() => {
     const channel = supabase
       .channel("menu-cliente")
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["menu"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_categories" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["menu-categories"] });
         queryClient.invalidateQueries({ queryKey: ["menu"] });
       })
       .subscribe();
@@ -114,43 +129,23 @@ function MenuPage() {
     };
   }, [queryClient]);
 
-  const categories = useMemo(() => {
+  const groups = useMemo(() => {
     const map = new Map<string, MenuItem[]>();
     for (const item of items) {
       map.set(item.category, [...(map.get(item.category) ?? []), item]);
     }
+    const rank = new Map(menuCats.map((c, i) => [c.name, i]));
     return [...map.entries()].sort((a, b) => {
-      const ia = CATEGORY_ORDER.indexOf(a[0]);
-      const ib = CATEGORY_ORDER.indexOf(b[0]);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      const ia = rank.get(a[0]);
+      const ib = rank.get(b[0]);
+      return (ia ?? 999) - (ib ?? 999);
     });
-  }, [items]);
+  }, [items, menuCats]);
 
-  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const activeCategory = selected ?? groups[0]?.[0] ?? null;
 
-  useEffect(() => {
-    if (categories.length === 0) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (visible) setActiveCategory(visible.target.getAttribute("data-category"));
-      },
-      { rootMargin: "-140px 0px -60% 0px", threshold: 0 },
-    );
-    for (const el of Object.values(sectionRefs.current)) if (el) observer.observe(el);
-    return () => observer.disconnect();
-  }, [categories]);
-
-  const scrollTo = (category: string) => {
-    const el = sectionRefs.current[category];
-    if (!el) return;
-    const top = el.getBoundingClientRect().top + window.scrollY - 116;
-    window.scrollTo({ top, behavior: "smooth" });
-  };
-
+  // ── Carrito (solo cuando hay mesa) ──
   const [cart, setCart] = useState<Record<string, number>>({});
   const [sending, setSending] = useState(false);
   const [confirmed, setConfirmed] = useState<null | { total: number; count: number }>(null);
@@ -233,140 +228,101 @@ function MenuPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background font-sans pb-44">
-      <header className="relative overflow-hidden rounded-b-[2rem] bg-deep text-primary-foreground">
+    <div className="min-h-screen bg-background font-sans">
+      {/* Foto del restaurante */}
+      <div className="relative h-64 w-full">
         <img
           src="/hero-bg.jpg"
-          alt=""
-          aria-hidden
-          className="absolute inset-0 h-full w-full object-cover opacity-70"
+          alt="Restaurante Punto Verde"
+          className="h-full w-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-ink/70 via-ink/30 to-ink/85" />
+        <button
+          onClick={toggle}
+          aria-label={theme === "dark" ? "Activar tema claro" : "Activar tema oscuro"}
+          className="absolute right-4 top-4 flex size-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur"
+        >
+          {theme === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
+        </button>
+      </div>
 
-        <div className="relative px-5 pb-10 pt-8">
-          <div className="flex items-center justify-between gap-3">
-            <img
-              src="/punto-verde-logo.png"
-              alt="Restaurante Punto Verde"
-              className="size-16 rounded-full object-cover shadow-lg ring-2 ring-white/25"
-            />
-            <button
-              onClick={toggle}
-              aria-label={theme === "dark" ? "Activar tema claro" : "Activar tema oscuro"}
-              className="mt-1 flex size-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
-            >
-              {theme === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
-            </button>
+      {/* Nombre y bienvenida */}
+      <div className="px-6 pt-6 text-center">
+        <h1 className="font-display text-4xl font-bold uppercase text-foreground">
+          Restaurante Punto Verde
+        </h1>
+        <p className="mt-3 text-lg text-muted-foreground">Cocina fresca, natural y de temporada.</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+          ¡Bienvenidos! Escoge una categoría para ver nuestros platos.
+        </p>
+        {tableNumber ? (
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-foreground px-4 py-1.5 text-sm font-semibold text-background">
+            Mesa <span>{tableNumber}</span>
           </div>
-
-          <h1 className="sr-only">Restaurante Punto Verde</h1>
-          <p className="mt-6 text-xs font-semibold uppercase tracking-[0.35em] text-[#F7C137]">
-            Bienvenidos · · Cocina con alma
+        ) : (
+          <p className="mt-4 inline-block rounded-full bg-muted px-4 py-1.5 text-xs text-muted-foreground">
+            Para pedir, escanea el código QR que está en tu mesa.
           </p>
-          <p className="mt-2 font-display text-[3.4rem] uppercase leading-[0.95] text-white">
-            Tradición{" "}
-            <span className="bg-[linear-gradient(90deg,#ff6b35,#f7c137)] bg-clip-text text-transparent">
-              y Sabor
-            </span>
-          </p>
+        )}
+      </div>
 
-          <p className="mt-3 text-sm text-white/85">
-            {tableNumber
-              ? `Estás pidiendo desde la mesa ${tableNumber}.`
-              : "Escanea el código QR de tu mesa para pedir."}
-          </p>
-          {tableNumber && (
-            <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-sm backdrop-blur">
-              Mesa <span className="font-semibold">{tableNumber}</span>
-            </div>
-          )}
-        </div>
-      </header>
+      {/* Botones de categorías */}
+      <div className="mt-8 space-y-3 px-5">
+        {isLoading && <p className="py-4 text-center text-muted-foreground">Cargando menú…</p>}
 
-      {categories.length > 0 && (
-        <nav className="sticky top-0 z-10 -mt-4 border-b border-border bg-background/90 px-3 py-3 backdrop-blur">
-          <ul className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none]">
-            {categories.map(([category]) => (
-              <li key={category}>
-                <button
-                  onClick={() => scrollTo(category)}
-                  className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                    activeCategory === category
-                      ? "bg-[#5F7A3A] text-white"
-                      : "bg-white text-ink border border-ink/20"
-                  }`}
-                >
-                  {category}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      )}
+        {groups.map(([category]) => {
+          const open = category === activeCategory;
+          return (
+            <button
+              key={category}
+              onClick={() => setSelected(open ? null : category)}
+              className={`flex w-full items-center justify-between rounded-2xl px-6 py-4 text-left font-display text-xl font-bold uppercase tracking-wide transition-colors ${
+                open
+                  ? "bg-foreground text-background"
+                  : "bg-muted text-foreground hover:bg-muted/70"
+              }`}
+            >
+              {category}
+              <ChevronRight className={`size-6 transition-transform ${open ? "rotate-90" : ""}`} />
+            </button>
+          );
+        })}
+      </div>
 
-      {!tableNumber && (
-        <div className="mx-5 mt-5 rounded-2xl border border-clay/40 bg-sand p-4 text-sm text-secondary-foreground">
-          Para pedir, escanea el código QR que está en tu mesa. Si ya lo hiciste y ves este mensaje,
-          pide ayuda a nuestro equipo.
-        </div>
-      )}
+      {/* Platos de la categoría elegida */}
+      {activeCategory && (
+        <section className="mt-8 px-5">
+          <h2 className="font-display text-3xl font-bold text-foreground">{activeCategory}</h2>
+          <div className="mt-1 h-px w-16 bg-clay" />
 
-      <main className="px-5">
-        {isLoading && <p className="py-10 text-center text-muted-foreground">Cargando menú…</p>}
-
-        {categories.map(([category, list]) => (
-          <section
-            key={category}
-            data-category={category}
-            ref={(el) => {
-              sectionRefs.current[category] = el;
-            }}
-            className="mt-8 scroll-mt-32"
-          >
-            <h2 className="font-display text-2xl text-foreground">{category}</h2>
-            <div className="mt-1 h-px w-16 bg-clay" />
-            <ul className="mt-4 space-y-4">
-              {list.map((item) => (
-                <li
-                  key={item.id}
-                  className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm"
-                >
-                  {item.image_url ? (
-                    <img
-                      src={item.image_url}
-                      alt={item.name}
-                      loading="lazy"
-                      width={768}
-                      height={576}
-                      className="h-44 w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-24 w-full items-center justify-center bg-secondary text-secondary-foreground">
-                      <Leaf className="size-6" />
+          <ul className="mt-2 divide-y divide-border">
+            {(groups.find(([c]) => c === activeCategory)?.[1] ?? []).map((item) => (
+              <li key={item.id} className="flex items-start gap-4 py-5">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-xl font-bold text-card-foreground">{item.name}</h3>
+                  {item.description && (
+                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                      {item.description}
+                    </p>
+                  )}
+                  {item.tags?.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                      {item.tags.map((tag) => (
+                        <TagChip key={tag} tag={tag} />
+                      ))}
                     </div>
                   )}
-                  <div className="flex items-start justify-between gap-3 p-4">
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-card-foreground">{item.name}</h3>
-                      <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
-                      {item.tags?.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {item.tags.map((tag) => (
-                            <TagChip key={tag} tag={tag} />
-                          ))}
-                        </div>
-                      )}
-                      <p className="mt-2 font-display text-lg text-primary">
-                        {currency(item.price)}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
+                  <p className="mt-2 font-display text-lg font-semibold text-primary">
+                    {currency(item.price)}
+                  </p>
+
+                  {tableNumber && (
+                    <div className="mt-3 flex items-center gap-3">
                       {(cart[item.id] ?? 0) > 0 && (
                         <>
                           <button
                             aria-label={`Quitar ${item.name}`}
                             onClick={() => add(item.id, -1)}
-                            className="flex size-9 items-center justify-center rounded-full border border-border text-foreground"
+                            className="flex size-9 items-center justify-center rounded-full border border-border text-foreground active:scale-95"
                           >
                             <Minus className="size-4" />
                           </button>
@@ -376,31 +332,44 @@ function MenuPage() {
                       <button
                         aria-label={`Agregar ${item.name}`}
                         onClick={() => add(item.id, 1)}
-                        className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:scale-95"
+                        className="flex size-9 items-center justify-center rounded-full bg-foreground text-background transition-transform active:scale-95"
                       >
                         <Plus className="size-4" />
                       </button>
                     </div>
+                  )}
+                </div>
+
+                {item.image_url ? (
+                  <img
+                    src={item.image_url}
+                    alt={item.name}
+                    loading="lazy"
+                    width={768}
+                    height={576}
+                    className="size-28 shrink-0 rounded-2xl object-cover"
+                  />
+                ) : (
+                  <div className="flex size-28 shrink-0 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                    <Leaf className="size-6" />
                   </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
-        <div className="mt-10 flex justify-center gap-6">
-          <Link
-            to="/cocina"
-            className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground"
-          >
-            <ChefHat className="size-4" /> Vista de cocina
-          </Link>
-          <Link to="/admin" className="text-xs uppercase tracking-widest text-muted-foreground">
-            Administración
-          </Link>
-        </div>
-      </main>
+      <div className="mt-10 flex justify-center gap-6 pb-12">
+        <Link to="/cocina" className="text-xs uppercase tracking-widest text-muted-foreground">
+          Cocina
+        </Link>
+        <Link to="/admin" className="text-xs uppercase tracking-widest text-muted-foreground">
+          Administración
+        </Link>
+      </div>
 
+      {/* Confirmación */}
       {confirmed && (
         <div className="fixed inset-0 z-20 flex items-end bg-foreground/40 p-4">
           <div className="w-full rounded-3xl bg-card p-6 text-center">
@@ -414,7 +383,7 @@ function MenuPage() {
             </p>
             <button
               onClick={() => setConfirmed(null)}
-              className="mt-5 w-full rounded-full bg-primary py-3 font-semibold text-primary-foreground"
+              className="mt-5 w-full rounded-full bg-foreground py-3 font-semibold text-background"
             >
               Seguir pidiendo
             </button>
@@ -422,7 +391,8 @@ function MenuPage() {
         </div>
       )}
 
-      {count > 0 && (
+      {/* Barra del carrito */}
+      {tableNumber && count > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 p-4 backdrop-blur">
           <div className="mb-3 max-h-32 space-y-1 overflow-y-auto text-sm">
             {cartLines.map((l) => (
@@ -436,9 +406,9 @@ function MenuPage() {
           </div>
           {error && <p className="mb-2 text-sm text-destructive">{error}</p>}
           <button
-            disabled={!tableNumber || sending}
+            disabled={sending}
             onClick={confirmOrder}
-            className="flex w-full items-center justify-between rounded-full bg-primary px-6 py-4 font-semibold text-primary-foreground disabled:opacity-50"
+            className="flex w-full items-center justify-between rounded-full bg-foreground px-6 py-4 font-semibold text-background disabled:opacity-50"
           >
             <span className="flex items-center gap-2">
               <ShoppingBag className="size-5" />
