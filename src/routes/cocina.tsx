@@ -7,8 +7,6 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
-  CookingPot,
-  Eye,
   Minus,
   Plus,
   Printer,
@@ -414,75 +412,56 @@ function KitchenPage() {
     }
   }
 
-  const renderOrderCard = (order: ActiveOrder, label?: string) => {
+  const isNewItem = (orderId: string, item: OrderItem) =>
+    viewNews?.id === orderId && !!item.added_at && item.added_at > viewNews.threshold;
+
+  const renderCompactCard = (order: ActiveOrder, label?: string) => {
     const total = orderTotal(order);
     const count = order.order_items.reduce((sum, i) => sum + i.quantity, 0);
+    const active = selectedOrderId === order.id;
     return (
-      <li
+      <button
         key={order.id}
-        className="relative flex min-h-[8.5rem] flex-col rounded-2xl border-2 border-primary bg-card p-4 shadow-sm"
+        onClick={() => openOrder(order)}
+        className={`relative w-full rounded-xl border p-2.5 text-left transition-colors ${
+          active ? "border-primary bg-card shadow-sm" : "border-border bg-card hover:border-primary/50"
+        }`}
       >
         {hasNews(order) && (
           <span
             aria-label="Se añadieron platos a este pedido"
-            className="absolute -right-1.5 -top-1.5 z-10 flex size-5 animate-pulse items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white ring-2 ring-background"
+            className="absolute -right-1 -top-1 z-10 flex size-4 animate-pulse items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-white ring-2 ring-background"
           >
             !
           </span>
         )}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <h2 className="font-display text-2xl leading-none">
-              {label ?? `Mesa ${order.table_number}`}
-            </h2>
-            <button
-              onClick={() => setMenuTable(order.table_number)}
-              aria-label={`Abrir menú para la mesa ${order.table_number}`}
-              className="flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground active:scale-95"
-            >
-              <BookOpen className="size-3.5" /> Menú
-            </button>
-          </div>
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-display text-lg leading-none text-card-foreground">
+            {label ?? `Mesa ${order.table_number}`}
+          </p>
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
             <Clock className="size-3" />
             {elapsedLabel(order.created_at, now)}
           </span>
         </div>
-
-        {label && label !== `Mesa ${order.table_number}` && (
-          <p className="mt-0.5 text-xs text-muted-foreground">Mesa {order.table_number}</p>
-        )}
-
-        <ul className="mt-2 space-y-0.5 text-sm">
-          {order.order_items.slice(0, 4).map((item) => (
-            <li key={item.id} className="truncate text-muted-foreground">
+        <div className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+          {order.order_items.slice(0, 3).map((item) => (
+            <p key={item.id} className="truncate">
               <span className="font-semibold text-card-foreground">{item.quantity}×</span>{" "}
               {item.name}
-            </li>
+            </p>
           ))}
-          {order.order_items.length > 4 && (
-            <li className="text-xs text-muted-foreground">
-              +{order.order_items.length - 4} más…
-            </li>
+          {order.order_items.length > 3 && (
+            <p className="text-muted-foreground/70">+{order.order_items.length - 3} más…</p>
           )}
-        </ul>
-        <p className="mt-1.5 text-sm">
-          <span className="font-semibold text-card-foreground">{currency(total)}</span>
-          <span className="text-muted-foreground"> · {count} ítem(s)</span>
-        </p>
-
-        <div className="mt-auto pt-3">
-          <button
-            onClick={() => openOrder(order)}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-2 text-sm font-semibold text-primary-foreground active:scale-[0.99]"
-          >
-            <Eye className="size-4" /> Ver pedido
-          </button>
         </div>
-      </li>
+        <p className="mt-1 text-xs font-semibold text-card-foreground">
+          {currency(total)}{" "}
+          <span className="font-normal text-muted-foreground">· {count} ítem(s)</span>
+        </p>
+      </button>
     );
   };
-
   return (
     <div className="min-h-screen bg-background font-sans pb-12">
       {/* Barra superior compacta y fija: siempre visible, sin foto */}
@@ -555,33 +534,111 @@ function KitchenPage() {
         )}
 
         {tables.length > 0 && (
-          <ul className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
-            {tables.map((table) => {
-              const order = orderByTable.get(table.table_number);
-              if (order) return renderOrderCard(order, table.label);
-              return (
-                <li
-                  key={table.id}
-                  className="flex min-h-[8.5rem] flex-col rounded-2xl border border-dashed border-border bg-secondary/40 p-4"
-                >
-                  <p className="font-display text-xl text-muted-foreground">{table.label}</p>
-                  <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground/70">
-                    Libre
-                  </p>
-                  <div className="mt-auto pt-3">
-                    <button
-                      onClick={() => setMenuTable(table.table_number)}
-                      aria-label={`Abrir menú para ${table.label}`}
-                      className="flex w-full items-center justify-center gap-2 rounded-full bg-secondary py-2 text-sm font-semibold text-secondary-foreground active:scale-[0.99]"
-                    >
-                      <BookOpen className="size-4" /> Menú
-                    </button>
+          <div className="mt-4 lg:mt-0 lg:flex">
+            {/* Lista compacta de mesas (izquierda) */}
+            <aside className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:sticky lg:top-14 lg:block lg:max-h-[calc(100vh-3.5rem)] lg:w-80 lg:shrink-0 lg:space-y-2 lg:overflow-y-auto lg:border-r lg:border-border lg:p-3">
+              {tables.map((table) => {
+                const order = orderByTable.get(table.table_number);
+                if (order) return renderCompactCard(order, table.label);
+                return (
+                  <button
+                    key={table.id}
+                    onClick={() => setMenuTable(table.table_number)}
+                    className="flex min-h-[4.5rem] w-full flex-col rounded-xl border border-dashed border-border bg-secondary/40 p-2.5 text-left opacity-80 transition-opacity hover:opacity-100"
+                  >
+                    <p className="font-display text-lg leading-none text-muted-foreground">
+                      {table.label}
+                    </p>
+                    <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground/70">
+                      Libre
+                    </p>
+                    <p className="mt-auto flex items-center gap-1 pt-1 text-[11px] font-semibold text-secondary-foreground">
+                      <BookOpen className="size-3" /> Abrir menú
+                    </p>
+                  </button>
+                );
+              })}
+              {orphanOrders.map((order) => renderCompactCard(order))}
+            </aside>
+
+            {/* Detalle del pedido (derecha, solo escritorio) */}
+            <section className="mt-4 hidden min-w-0 flex-1 lg:mt-0 lg:block lg:p-5">
+              {selectedOrder ? (
+                <div className="max-w-2xl">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h2 className="font-display text-4xl leading-none">
+                        Mesa {selectedOrder.table_number}
+                      </h2>
+                      <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                        <Clock className="size-3" />
+                        {elapsedLabel(selectedOrder.created_at, now)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setMenuTable(selectedOrder.table_number)}
+                        className="flex items-center gap-1.5 rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground active:scale-[0.99]"
+                      >
+                        <BookOpen className="size-4" /> Menú
+                      </button>
+                      <button
+                        onClick={() => printTicket(selectedOrder)}
+                        className="flex items-center gap-1.5 rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground active:scale-[0.99]"
+                      >
+                        <Printer className="size-4" /> Imprimir
+                      </button>
+                    </div>
                   </div>
-                </li>
-              );
-            })}
-            {orphanOrders.map((order) => renderOrderCard(order))}
-          </ul>
+
+                  <ul className="mt-5 space-y-2 border-t border-border pt-4">
+                    {selectedOrder.order_items.map((item) => {
+                      const isNew = isNewItem(selectedOrder.id, item);
+                      return (
+                        <li
+                          key={item.id}
+                          className={`flex justify-between gap-2 rounded-lg px-2 py-2 text-sm ${
+                            isNew ? "bg-primary/15" : ""
+                          }`}
+                        >
+                          <span className="text-card-foreground">
+                            <span className="mr-2 inline-flex min-w-6 justify-center rounded-md bg-accent px-1.5 font-semibold text-accent-foreground">
+                              {item.quantity}
+                            </span>
+                            {item.name}
+                            {isNew && (
+                              <span className="ml-2 rounded-full bg-primary px-2 py-0.5 align-middle text-[10px] font-bold text-primary-foreground">
+                                Nuevo
+                              </span>
+                            )}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {currency(Number(item.unit_price) * item.quantity)}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  <div className="mt-4 flex justify-between border-t border-border pt-3 text-sm font-semibold">
+                    <span>Total</span>
+                    <span>{currency(orderTotal(selectedOrder))}</span>
+                  </div>
+
+                  <button
+                    onClick={() => confirmClose(selectedOrder)}
+                    className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground active:scale-[0.99]"
+                  >
+                    <Check className="size-4" /> Marcar servido / cerrar
+                  </button>
+                </div>
+              ) : (
+                <div className="flex h-64 items-center justify-center text-sm text-muted-foreground lg:h-[50vh]">
+                  Selecciona una mesa de la lista para ver su pedido completo
+                </div>
+              )}
+            </section>
+          </div>
         )}
 
         <div className="mt-10 text-center">
@@ -725,7 +782,7 @@ function KitchenPage() {
 
       {selectedOrder && (
         <div
-          className="fixed inset-0 z-30 flex items-center justify-center bg-ink/60 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-30 flex items-center justify-center bg-ink/60 p-4 backdrop-blur-sm lg:hidden"
           onClick={() => setSelectedOrderId(null)}
         >
           <div
