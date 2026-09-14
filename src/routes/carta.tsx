@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -132,42 +132,12 @@ function CartaPage() {
     });
   }, [items, menuCats]);
 
-  // ── Chips + scroll a la sección activa ──
-  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  // ── Solo UNA categoría visible a la vez ──
   const [activeCategory, setActiveCategory] = useState<string | null>(categoria ?? null);
-  const didInit = useRef(false);
-
-  const scrollTo = (name: string) => {
-    const el = sectionRefs.current[name];
-    if (!el) return;
-    const top = el.getBoundingClientRect().top + window.scrollY - 132;
-    window.scrollTo({ top, behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    if (didInit.current || groups.length === 0) return;
-    didInit.current = true;
-    const target =
-      categoria && groups.some(([n]) => n === categoria) ? categoria : groups[0][0];
-    setActiveCategory(target);
-    requestAnimationFrame(() => scrollTo(target));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groups]);
-
-  useEffect(() => {
-    if (groups.length === 0) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (visible) setActiveCategory(visible.target.getAttribute("data-category"));
-      },
-      { rootMargin: "-140px 0px -60% 0px", threshold: 0 },
-    );
-    for (const el of Object.values(sectionRefs.current)) if (el) observer.observe(el);
-    return () => observer.disconnect();
-  }, [groups]);
+  const visibleCategory =
+    activeCategory && groups.some(([n]) => n === activeCategory)
+      ? activeCategory
+      : (groups[0]?.[0] ?? null);
 
   // ── Carrito (solo con mesa) ──
   const [cart, setCart] = useState<Record<string, number>>({});
@@ -306,10 +276,7 @@ function CartaPage() {
             {groups.map(([category]) => (
               <li key={category}>
                 <button
-                  onClick={() => {
-                    setActiveCategory(category);
-                    scrollTo(category);
-                  }}
+                  onClick={() => setActiveCategory(category)}
                   className={`whitespace-nowrap rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors ${
                     activeCategory === category
                       ? "border-foreground bg-foreground text-background"
@@ -328,15 +295,9 @@ function CartaPage() {
       <main>
         {isLoading && <p className="py-10 text-center text-muted-foreground">Cargando carta…</p>}
 
-        {groups.map(([category, list]) => (
-          <section
-            key={category}
-            data-category={category}
-            ref={(el) => {
-              sectionRefs.current[category] = el;
-            }}
-            className="scroll-mt-32"
-          >
+        {groups.map(([category, list]) =>
+          category !== visibleCategory ? null : (
+          <section key={category} className="scroll-mt-32">
             <h2 className="mt-6 bg-muted px-5 py-2.5 font-display text-2xl font-bold text-foreground">
               {category}
             </h2>
@@ -402,7 +363,8 @@ function CartaPage() {
               ))}
             </ul>
           </section>
-        ))}
+          ),
+        )}
 
         {/* Notas de la carta */}
         <div className="mt-8 space-y-1 px-5 text-sm text-muted-foreground">
