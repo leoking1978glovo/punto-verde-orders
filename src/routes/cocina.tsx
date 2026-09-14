@@ -444,7 +444,7 @@ function KitchenPage() {
     );
   };
   return (
-    <div className="min-h-screen bg-background font-sans pb-12">
+    <div className="min-h-screen bg-background font-sans pb-12 md:flex md:h-screen md:flex-col md:overflow-hidden md:pb-0">
       {/* Barra superior compacta y fija: siempre visible, sin foto */}
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
         <div className="flex items-center justify-between gap-2">
@@ -469,7 +469,7 @@ function KitchenPage() {
         </div>
       </header>
 
-      <main className="px-3">
+      <main className="px-3 md:flex md:min-h-0 md:flex-1 md:flex-col md:px-0">
         {(isLoading || tablesLoading) && (
           <p className="py-10 text-center text-muted-foreground">Cargando mesas…</p>
         )}
@@ -491,7 +491,7 @@ function KitchenPage() {
 
         {/* Cola de pedidos: por orden de llegada */}
         {queue.length > 0 && (
-          <div className="mt-5">
+          <div className="mt-5 md:shrink-0 md:px-4 md:pt-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Cola · por orden de llegada
             </p>
@@ -515,9 +515,9 @@ function KitchenPage() {
         )}
 
         {tables.length > 0 && (
-          <div className="mt-4 md:mt-0 md:flex">
+          <div className="mt-4 md:mt-0 md:flex md:min-h-0 md:flex-1">
             {/* Lista compacta de mesas (izquierda) */}
-            <aside className="grid grid-cols-4 content-start gap-2 p-4 sm:grid-cols-6 md:sticky md:top-14 md:grid-cols-4 md:gap-2.5 md:self-start md:p-3 md:max-h-[calc(100vh-3.5rem)] md:w-80 md:shrink-0 md:overflow-y-auto md:border-r md:border-border">
+            <aside className="grid grid-cols-4 content-start gap-2 p-4 sm:grid-cols-6 md:h-full md:grid-cols-4 md:gap-2.5 md:p-3 md:w-80 md:shrink-0 md:overflow-y-auto md:border-r md:border-border">
               {tables.map((table) => {
                 const order = orderByTable.get(table.table_number);
                 if (order) return renderCompactCard(order);
@@ -536,7 +536,7 @@ function KitchenPage() {
             </aside>
 
             {/* Detalle del pedido (derecha, solo escritorio) */}
-            <section className="mt-4 hidden min-w-0 flex-1 md:mt-0 md:block md:p-5">
+            <section className="mt-4 hidden min-w-0 flex-1 md:mt-0 md:block md:h-full md:overflow-y-auto md:p-5">
               {selectedOrder ? (
                 <div className="flex max-w-2xl flex-col">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -615,7 +615,7 @@ function KitchenPage() {
           </div>
         )}
 
-        <div className="mt-10 text-center">
+        <div className="mt-10 text-center md:mt-0 md:shrink-0 md:border-t md:border-border md:py-2">
           <p className="inline-flex items-center gap-2 rounded-full bg-muted px-4 py-2 text-sm font-semibold tabular-nums text-muted-foreground">
             <Clock className="size-4" />
             {new Date(now).toLocaleTimeString("es-ES", {
