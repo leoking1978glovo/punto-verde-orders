@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Moon, Sun } from "lucide-react";
+import { ChevronLeft, ChevronRight, Moon, Sun } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTheme } from "@/lib/theme";
 import { RESTAURANT } from "@/lib/restaurant";
@@ -43,6 +43,7 @@ function HomePage() {
   const { mesa } = Route.useSearch();
   const tableNumber = mesa && /^\d+$/.test(mesa) ? Number(mesa) : null;
   const { theme, toggle } = useTheme();
+  const [catIndex, setCatIndex] = useState(0);
   const queryClient = useQueryClient();
 
   const { data: menuCats = [], isLoading } = useQuery({
@@ -116,27 +117,50 @@ function HomePage() {
         )}
       </div>
 
-      {/* Botones de categorías → abren la página de la carta */}
-      <div className="mt-8 space-y-3 px-5">
+      {/* Una categoría a la vez, con flechas para pasar de una a otra */}
+      <div className="mt-8 px-5">
         {isLoading && <p className="py-4 text-center text-muted-foreground">Cargando…</p>}
 
-        {menuCats.map((cat) => (
-          <Link
-            key={cat.name}
-            to="/carta"
-            search={{
-              categoria: cat.name,
-              ...(tableNumber ? { mesa: String(tableNumber) } : {}),
-            }}
-            className="flex w-full items-center justify-between rounded-2xl bg-muted px-6 py-4 font-display text-xl font-bold uppercase tracking-wide text-foreground transition-colors hover:bg-muted/70"
-          >
-            {cat.name}
-            <ChevronRight className="size-6" />
-          </Link>
-        ))}
+        {!isLoading && menuCats.length > 0 && (
+          <>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCatIndex((catIndex - 1 + menuCats.length) % menuCats.length)}
+                aria-label="Categoría anterior"
+                className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted text-foreground active:scale-95"
+              >
+                <ChevronLeft className="size-6" />
+              </button>
+
+              <Link
+                to="/carta"
+                search={{
+                  categoria: menuCats[catIndex % menuCats.length].name,
+                  ...(tableNumber ? { mesa: String(tableNumber) } : {}),
+                }}
+                className="flex min-h-[4.5rem] flex-1 items-center justify-between gap-2 rounded-2xl bg-foreground px-6 py-4 font-display text-xl font-bold uppercase tracking-wide text-background"
+              >
+                {menuCats[catIndex % menuCats.length].name}
+                <ChevronRight className="size-6 shrink-0" />
+              </Link>
+
+              <button
+                onClick={() => setCatIndex((catIndex + 1) % menuCats.length)}
+                aria-label="Siguiente categoría"
+                className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted text-foreground active:scale-95"
+              >
+                <ChevronRight className="size-6" />
+              </button>
+            </div>
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              {(catIndex % menuCats.length) + 1} de {menuCats.length} · toca la tarjeta para ver los
+              platos
+            </p>
+          </>
+        )}
       </div>
 
-      <RestaurantFooter />
+            <RestaurantFooter />
     </div>
   );
 }
