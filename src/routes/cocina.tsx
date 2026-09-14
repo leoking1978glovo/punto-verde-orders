@@ -538,10 +538,10 @@ function KitchenPage() {
             {/* Detalle del pedido (derecha, solo escritorio) */}
             <section className="mt-4 hidden min-w-0 flex-1 lg:mt-0 lg:block lg:p-5">
               {selectedOrder ? (
-                <div className="max-w-2xl">
+                <div className="flex max-w-2xl flex-col">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h2 className="font-display text-4xl leading-none">
+                      <h2 className="font-display text-3xl leading-none">
                         Mesa {selectedOrder.table_number}
                       </h2>
                       <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
@@ -565,13 +565,13 @@ function KitchenPage() {
                     </div>
                   </div>
 
-                  <ul className="mt-5 space-y-2 border-t border-border pt-4">
+                  <ul className="mt-4 max-h-[45vh] space-y-1 overflow-y-auto border-t border-border pt-3 pr-1">
                     {selectedOrder.order_items.map((item) => {
                       const isNew = isNewItem(selectedOrder.id, item);
                       return (
                         <li
                           key={item.id}
-                          className={`flex justify-between gap-2 rounded-lg px-2 py-2 text-sm ${
+                          className={`flex justify-between gap-2 rounded-lg px-2 py-1 text-sm ${
                             isNew ? "bg-primary/15" : ""
                           }`}
                         >
@@ -594,14 +594,14 @@ function KitchenPage() {
                     })}
                   </ul>
 
-                  <div className="mt-4 flex justify-between border-t border-border pt-3 text-sm font-semibold">
+                  <div className="mt-3 flex shrink-0 justify-between border-t border-border pt-3 text-sm font-semibold">
                     <span>Total</span>
                     <span>{currency(orderTotal(selectedOrder))}</span>
                   </div>
 
                   <button
                     onClick={() => confirmClose(selectedOrder)}
-                    className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground active:scale-[0.99]"
+                    className="mt-4 flex w-full shrink-0 items-center justify-center gap-2 rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground active:scale-[0.99]"
                   >
                     <Check className="size-4" /> Marcar servido / cerrar
                   </button>
