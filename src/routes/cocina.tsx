@@ -306,15 +306,12 @@ function KitchenPage() {
   }, [selectedOrderId, selectedOrder]);
 
   async function openOrder(order: ActiveOrder) {
-    // Resaltado naranja: solo cuando se añadieron platos a un pedido existente
-    if (order.items_updated_at) {
-      setViewNews({
-        id: order.id,
-        threshold: order.kitchen_seen_at ?? order.created_at,
-      });
-    } else {
-      setViewNews(null);
-    }
+    // Umbral de "Nuevo": todo lo añadido desde la última vez que cocina lo vio
+    // (en un pedido NUNCA visto, el umbral es su creación → TODOS los platos salen como Nuevo)
+    setViewNews({
+      id: order.id,
+      threshold: order.kitchen_seen_at ?? order.created_at,
+    });
     // Marcar como visto siempre (quita la burbuja)
     await supabase
       .from("orders")
@@ -416,7 +413,7 @@ function KitchenPage() {
   }
 
   const isNewItem = (orderId: string, item: OrderItem) =>
-    viewNews?.id === orderId && !!item.added_at && item.added_at > viewNews.threshold;
+    viewNews?.id === orderId && !!item.added_at && item.added_at >= viewNews.threshold;
 
   const renderCompactCard = (order: ActiveOrder) => {
     const active = selectedOrderId === order.id;
@@ -787,7 +784,7 @@ function KitchenPage() {
                 const isNew =
                   viewNews?.id === selectedOrder.id &&
                   !!item.added_at &&
-                  item.added_at > viewNews.threshold;
+                  item.added_at >= viewNews.threshold;
                 return (
                   <li
                     key={item.id}
