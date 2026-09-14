@@ -152,7 +152,7 @@ function KitchenPage() {
   const [now, setNow] = useState(() => Date.now());
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [menuTable, setMenuTable] = useState<number | null>(null);
-  const [viewNews, setViewNews] = useState<{ id: string; threshold: string } | null>(null);
+  const [viewNews, setViewNews] = useState<{ id: string; threshold: string | null } | null>(null);
   const [menuCart, setMenuCart] = useState<Record<string, number>>({});
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [quickSending, setQuickSending] = useState(false);
@@ -306,11 +306,11 @@ function KitchenPage() {
   }, [selectedOrderId, selectedOrder]);
 
   async function openOrder(order: ActiveOrder) {
-    // Umbral de "Nuevo": todo lo añadido desde la última vez que cocina lo vio
-    // (en un pedido NUNCA visto, el umbral es su creación → TODOS los platos salen como Nuevo)
+    // Umbral de "Nuevo": cuándo vio cocina este pedido por última vez.
+    // null = pedido NUNCA visto → TODOS sus platos salen como Nuevo.
     setViewNews({
       id: order.id,
-      threshold: order.kitchen_seen_at ?? order.created_at,
+      threshold: order.kitchen_seen_at,
     });
     // Marcar como visto siempre (quita la burbuja)
     await supabase
@@ -412,8 +412,11 @@ function KitchenPage() {
     }
   }
 
-  const isNewItem = (orderId: string, item: OrderItem) =>
-    viewNews?.id === orderId && !!item.added_at && item.added_at >= viewNews.threshold;
+  const isNewItem = (orderId: string, item: OrderItem) => {
+    if (viewNews?.id !== orderId) return false;
+    if (viewNews.threshold === null) return true; // pedido nuevo: todo sin servir
+    return !!item.added_at && item.added_at >= viewNews.threshold;
+  };
 
   const renderCompactCard = (order: ActiveOrder) => {
     const active = selectedOrderId === order.id;
@@ -781,10 +784,7 @@ function KitchenPage() {
 
             <ul className="mt-4 max-h-64 space-y-2 overflow-y-auto border-t border-border pt-4">
               {selectedOrder.order_items.map((item) => {
-                const isNew =
-                  viewNews?.id === selectedOrder.id &&
-                  !!item.added_at &&
-                  item.added_at >= viewNews.threshold;
+                const isNew = isNewItem(selectedOrder.id, item);
                 return (
                   <li
                     key={item.id}
