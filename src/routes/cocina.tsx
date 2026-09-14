@@ -415,16 +415,17 @@ function KitchenPage() {
   const isNewItem = (orderId: string, item: OrderItem) =>
     viewNews?.id === orderId && !!item.added_at && item.added_at > viewNews.threshold;
 
-  const renderCompactCard = (order: ActiveOrder, label?: string) => {
-    const total = orderTotal(order);
-    const count = order.order_items.reduce((sum, i) => sum + i.quantity, 0);
+  const renderCompactCard = (order: ActiveOrder) => {
     const active = selectedOrderId === order.id;
     return (
       <button
         key={order.id}
         onClick={() => openOrder(order)}
-        className={`relative w-full rounded-xl border p-2.5 text-left transition-colors ${
-          active ? "border-primary bg-card shadow-sm" : "border-border bg-card hover:border-primary/50"
+        title={`Mesa ${order.table_number} — ver pedido`}
+        className={`relative flex aspect-square items-center justify-center rounded-xl font-display text-2xl transition-colors ${
+          active
+            ? "border-2 border-primary bg-primary text-primary-foreground"
+            : "border-2 border-primary bg-card text-card-foreground hover:bg-primary/10"
         }`}
       >
         {hasNews(order) && (
@@ -435,30 +436,7 @@ function KitchenPage() {
             !
           </span>
         )}
-        <div className="flex items-center justify-between gap-2">
-          <p className="font-display text-lg leading-none text-card-foreground">
-            {label ?? `Mesa ${order.table_number}`}
-          </p>
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-            <Clock className="size-3" />
-            {elapsedLabel(order.created_at, now)}
-          </span>
-        </div>
-        <div className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
-          {order.order_items.slice(0, 3).map((item) => (
-            <p key={item.id} className="truncate">
-              <span className="font-semibold text-card-foreground">{item.quantity}×</span>{" "}
-              {item.name}
-            </p>
-          ))}
-          {order.order_items.length > 3 && (
-            <p className="text-muted-foreground/70">+{order.order_items.length - 3} más…</p>
-          )}
-        </div>
-        <p className="mt-1 text-xs font-semibold text-card-foreground">
-          {currency(total)}{" "}
-          <span className="font-normal text-muted-foreground">· {count} ítem(s)</span>
-        </p>
+        {order.table_number}
       </button>
     );
   };
@@ -536,25 +514,18 @@ function KitchenPage() {
         {tables.length > 0 && (
           <div className="mt-4 lg:mt-0 lg:flex">
             {/* Lista compacta de mesas (izquierda) */}
-            <aside className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:sticky lg:top-14 lg:block lg:max-h-[calc(100vh-3.5rem)] lg:w-80 lg:shrink-0 lg:space-y-2 lg:overflow-y-auto lg:border-r lg:border-border lg:p-3">
+            <aside className="grid grid-cols-4 gap-2 p-4 sm:grid-cols-6 lg:sticky lg:top-14 lg:grid-cols-4 lg:gap-2.5 lg:p-3 lg:max-h-[calc(100vh-3.5rem)] lg:w-80 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-border">
               {tables.map((table) => {
                 const order = orderByTable.get(table.table_number);
-                if (order) return renderCompactCard(order, table.label);
+                if (order) return renderCompactCard(order);
                 return (
                   <button
                     key={table.id}
                     onClick={() => setMenuTable(table.table_number)}
-                    className="flex min-h-[4.5rem] w-full flex-col rounded-xl border border-dashed border-border bg-secondary/40 p-2.5 text-left opacity-80 transition-opacity hover:opacity-100"
+                    title={`Mesa ${table.table_number} libre — abrir menú`}
+                    className="flex aspect-square items-center justify-center rounded-xl border border-dashed border-border bg-muted font-display text-2xl text-muted-foreground transition-colors hover:bg-muted/70"
                   >
-                    <p className="font-display text-lg leading-none text-muted-foreground">
-                      {table.label}
-                    </p>
-                    <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground/70">
-                      Libre
-                    </p>
-                    <p className="mt-auto flex items-center gap-1 pt-1 text-[11px] font-semibold text-secondary-foreground">
-                      <BookOpen className="size-3" /> Abrir menú
-                    </p>
+                    {table.table_number}
                   </button>
                 );
               })}
