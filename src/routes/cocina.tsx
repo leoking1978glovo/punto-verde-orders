@@ -158,7 +158,7 @@ function KitchenPage() {
   const [quickSending, setQuickSending] = useState(false);
 
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 30000);
+    const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
 
@@ -616,9 +616,14 @@ function KitchenPage() {
         )}
 
         <div className="mt-10 text-center">
-          <Link to="/" className="text-xs uppercase tracking-widest text-muted-foreground">
-            Ir al menú del cliente
-          </Link>
+          <p className="inline-flex items-center gap-2 rounded-full bg-muted px-4 py-2 text-sm font-semibold tabular-nums text-muted-foreground">
+            <Clock className="size-4" />
+            {new Date(now).toLocaleTimeString("es-ES", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })}
+          </p>
         </div>
       </main>
 
