@@ -453,9 +453,22 @@ function KitchenPage() {
           <p className="mt-0.5 text-xs text-muted-foreground">Mesa {order.table_number}</p>
         )}
 
-        <p className="mt-2 text-sm text-muted-foreground">
-          {count} ítem(s) ·{" "}
+        <ul className="mt-2 space-y-0.5 text-sm">
+          {order.order_items.slice(0, 4).map((item) => (
+            <li key={item.id} className="truncate text-muted-foreground">
+              <span className="font-semibold text-card-foreground">{item.quantity}×</span>{" "}
+              {item.name}
+            </li>
+          ))}
+          {order.order_items.length > 4 && (
+            <li className="text-xs text-muted-foreground">
+              +{order.order_items.length - 4} más…
+            </li>
+          )}
+        </ul>
+        <p className="mt-1.5 text-sm">
           <span className="font-semibold text-card-foreground">{currency(total)}</span>
+          <span className="text-muted-foreground"> · {count} ítem(s)</span>
         </p>
 
         <div className="mt-auto pt-3">
