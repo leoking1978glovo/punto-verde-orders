@@ -77,9 +77,11 @@ function elapsedLabel(createdAt: string, now: number) {
 }
 
 function hasNews(order: ActiveOrder) {
+  // Burbuja si: la cocina NO lo ha visto nunca (pedido nuevo)
+  // o si se añadieron platos después de la última vez que lo vio
   return (
-    !!order.items_updated_at &&
-    (!order.kitchen_seen_at || order.items_updated_at > order.kitchen_seen_at)
+    !order.kitchen_seen_at ||
+    (!!order.items_updated_at && order.items_updated_at > order.kitchen_seen_at)
   );
 }
 
@@ -304,20 +306,21 @@ function KitchenPage() {
   }, [selectedOrderId, selectedOrder]);
 
   async function openOrder(order: ActiveOrder) {
-    if (hasNews(order)) {
-      // Umbral: todo lo añadido DESPUÉS de la última vez que cocina lo vio se pinta en naranja
+    // Resaltado naranja: solo cuando se añadieron platos a un pedido existente
+    if (order.items_updated_at) {
       setViewNews({
         id: order.id,
         threshold: order.kitchen_seen_at ?? order.created_at,
       });
-      await supabase
-        .from("orders")
-        .update({ kitchen_seen_at: order.items_updated_at })
-        .eq("id", order.id);
-      queryClient.invalidateQueries({ queryKey: ["active-orders"] });
     } else {
       setViewNews(null);
     }
+    // Marcar como visto siempre (quita la burbuja)
+    await supabase
+      .from("orders")
+      .update({ kitchen_seen_at: new Date().toISOString() })
+      .eq("id", order.id);
+    queryClient.invalidateQueries({ queryKey: ["active-orders"] });
     setSelectedOrderId(order.id);
   }
 
@@ -430,7 +433,7 @@ function KitchenPage() {
       >
         {hasNews(order) && (
           <span
-            aria-label="Se añadieron platos a este pedido"
+            aria-label="Pedido nuevo o actualizado"
             className="absolute -right-1 -top-1 z-10 flex size-4 animate-pulse items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-white ring-2 ring-background"
           >
             !
