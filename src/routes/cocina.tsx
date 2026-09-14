@@ -517,7 +517,7 @@ function KitchenPage() {
         {tables.length > 0 && (
           <div className="mt-4 lg:mt-0 lg:flex">
             {/* Lista compacta de mesas (izquierda) */}
-            <aside className="grid grid-cols-4 gap-2 p-4 sm:grid-cols-6 lg:sticky lg:top-14 lg:grid-cols-4 lg:gap-2.5 lg:p-3 lg:max-h-[calc(100vh-3.5rem)] lg:w-80 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-border">
+            <aside className="grid grid-cols-4 content-start gap-2 p-4 sm:grid-cols-6 lg:sticky lg:top-14 lg:grid-cols-4 lg:gap-2.5 lg:self-start lg:p-3 lg:max-h-[calc(100vh-3.5rem)] lg:w-80 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-border">
               {tables.map((table) => {
                 const order = orderByTable.get(table.table_number);
                 if (order) return renderCompactCard(order);
