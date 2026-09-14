@@ -226,7 +226,7 @@ function CartaPage() {
         if (match) {
           const { error: updError } = await supabase
             .from("order_items")
-            .update({ quantity: match.quantity + line.qty })
+            .update({ quantity: match.quantity + line.qty, added_at: new Date().toISOString() })
             .eq("id", match.id);
           if (updError) throw updError;
         } else {
@@ -236,6 +236,7 @@ function CartaPage() {
             name: line.item.name,
             unit_price: line.item.price,
             quantity: line.qty,
+            added_at: new Date().toISOString(),
           });
           if (insError) throw insError;
         }

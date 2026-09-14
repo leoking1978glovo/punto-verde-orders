@@ -76,6 +76,7 @@ export type Database = {
       }
       order_items: {
         Row: {
+          added_at: string | null
           created_at: string
           id: string
           menu_item_id: string | null
@@ -85,6 +86,7 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          added_at?: string | null
           created_at?: string
           id?: string
           menu_item_id?: string | null
@@ -94,6 +96,7 @@ export type Database = {
           unit_price: number
         }
         Update: {
+          added_at?: string | null
           created_at?: string
           id?: string
           menu_item_id?: string | null

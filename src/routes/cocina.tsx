@@ -30,6 +30,7 @@ type OrderItem = {
   name: string;
   quantity: number;
   unit_price: number;
+  added_at: string | null;
 };
 
 type ActiveOrder = {
@@ -151,6 +152,7 @@ function KitchenPage() {
   const [now, setNow] = useState(() => Date.now());
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [menuTable, setMenuTable] = useState<number | null>(null);
+  const [viewNews, setViewNews] = useState<{ id: string; threshold: string } | null>(null);
   const [menuCart, setMenuCart] = useState<Record<string, number>>({});
   const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [quickSending, setQuickSending] = useState(false);
@@ -207,7 +209,7 @@ function KitchenPage() {
       const { data, error } = await supabase
         .from("orders")
         .select(
-          "id, table_number, created_at, items_updated_at, kitchen_seen_at, order_items(id, name, quantity, unit_price)"
+          "id, table_number, created_at, items_updated_at, kitchen_seen_at, order_items(id, name, quantity, unit_price, added_at)"
         )
         .eq("status", "activo")
         .order("created_at");
@@ -304,14 +306,21 @@ function KitchenPage() {
   }, [selectedOrderId, selectedOrder]);
 
   async function openOrder(order: ActiveOrder) {
-    setSelectedOrderId(order.id);
     if (hasNews(order)) {
+      // Umbral: todo lo añadido DESPUÉS de la última vez que cocina lo vio se pinta en naranja
+      setViewNews({
+        id: order.id,
+        threshold: order.kitchen_seen_at ?? order.created_at,
+      });
       await supabase
         .from("orders")
         .update({ kitchen_seen_at: order.items_updated_at })
         .eq("id", order.id);
       queryClient.invalidateQueries({ queryKey: ["active-orders"] });
+    } else {
+      setViewNews(null);
     }
+    setSelectedOrderId(order.id);
   }
 
   async function closeOrder(id: string) {
@@ -373,7 +382,7 @@ function KitchenPage() {
         if (match) {
           const { error: updError } = await supabase
             .from("order_items")
-            .update({ quantity: match.quantity + line.qty })
+            .update({ quantity: match.quantity + line.qty, added_at: new Date().toISOString() })
             .eq("id", match.id);
           if (updError) throw updError;
         } else {
@@ -383,6 +392,7 @@ function KitchenPage() {
             name: line.item.name,
             unit_price: line.item.price,
             quantity: line.qty,
+            added_at: new Date().toISOString(),
           });
           if (insError) throw insError;
         }
@@ -729,19 +739,35 @@ function KitchenPage() {
             </div>
 
             <ul className="mt-4 max-h-64 space-y-2 overflow-y-auto border-t border-border pt-4">
-              {selectedOrder.order_items.map((item) => (
-                <li key={item.id} className="flex justify-between text-sm">
-                  <span className="text-card-foreground">
-                    <span className="mr-2 inline-flex min-w-6 justify-center rounded-md bg-accent px-1.5 font-semibold text-accent-foreground">
-                      {item.quantity}
+              {selectedOrder.order_items.map((item) => {
+                const isNew =
+                  viewNews?.id === selectedOrder.id &&
+                  !!item.added_at &&
+                  item.added_at > viewNews.threshold;
+                return (
+                  <li
+                    key={item.id}
+                    className={`flex justify-between gap-2 rounded-lg px-2 py-1.5 text-sm ${
+                      isNew ? "bg-primary/15" : ""
+                    }`}
+                  >
+                    <span className="text-card-foreground">
+                      <span className="mr-2 inline-flex min-w-6 justify-center rounded-md bg-accent px-1.5 font-semibold text-accent-foreground">
+                        {item.quantity}
+                      </span>
+                      {item.name}
+                      {isNew && (
+                        <span className="ml-2 rounded-full bg-primary px-2 py-0.5 align-middle text-[10px] font-bold text-primary-foreground">
+                          Nuevo
+                        </span>
+                      )}
                     </span>
-                    {item.name}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {currency(Number(item.unit_price) * item.quantity)}
-                  </span>
-                </li>
-              ))}
+                    <span className="text-muted-foreground">
+                      {currency(Number(item.unit_price) * item.quantity)}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
 
             <div className="mt-4 flex justify-between border-t border-border pt-3 text-sm font-semibold">
