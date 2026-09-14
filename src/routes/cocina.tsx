@@ -515,9 +515,9 @@ function KitchenPage() {
         )}
 
         {tables.length > 0 && (
-          <div className="mt-4 lg:mt-0 lg:flex">
+          <div className="mt-4 md:mt-0 md:flex">
             {/* Lista compacta de mesas (izquierda) */}
-            <aside className="grid grid-cols-4 content-start gap-2 p-4 sm:grid-cols-6 lg:sticky lg:top-14 lg:grid-cols-4 lg:gap-2.5 lg:self-start lg:p-3 lg:max-h-[calc(100vh-3.5rem)] lg:w-80 lg:shrink-0 lg:overflow-y-auto lg:border-r lg:border-border">
+            <aside className="grid grid-cols-4 content-start gap-2 p-4 sm:grid-cols-6 md:sticky md:top-14 md:grid-cols-4 md:gap-2.5 md:self-start md:p-3 md:max-h-[calc(100vh-3.5rem)] md:w-80 md:shrink-0 md:overflow-y-auto md:border-r md:border-border">
               {tables.map((table) => {
                 const order = orderByTable.get(table.table_number);
                 if (order) return renderCompactCard(order);
@@ -536,7 +536,7 @@ function KitchenPage() {
             </aside>
 
             {/* Detalle del pedido (derecha, solo escritorio) */}
-            <section className="mt-4 hidden min-w-0 flex-1 lg:mt-0 lg:block lg:p-5">
+            <section className="mt-4 hidden min-w-0 flex-1 md:mt-0 md:block md:p-5">
               {selectedOrder ? (
                 <div className="flex max-w-2xl flex-col">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -607,7 +607,7 @@ function KitchenPage() {
                   </button>
                 </div>
               ) : (
-                <div className="flex h-64 items-center justify-center text-sm text-muted-foreground lg:h-[50vh]">
+                <div className="flex h-64 items-center justify-center text-sm text-muted-foreground md:h-[50vh]">
                   Selecciona una mesa de la lista para ver su pedido completo
                 </div>
               )}
@@ -761,7 +761,7 @@ function KitchenPage() {
 
       {selectedOrder && (
         <div
-          className="fixed inset-0 z-30 flex items-center justify-center bg-ink/60 p-4 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-30 flex items-center justify-center bg-ink/60 p-4 backdrop-blur-sm md:hidden"
           onClick={() => setSelectedOrderId(null)}
         >
           <div
